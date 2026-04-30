@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
+import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,10 +21,8 @@ class MyApp extends StatelessWidget {
       providers: [ChangeNotifierProvider(create: (_) => UserAuthProvider())],
       child: MaterialApp(
         title: 'ELBites',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-          useMaterial3: true,
-        ),
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark,
         home: const HomeScreen(),
       ),
     );
