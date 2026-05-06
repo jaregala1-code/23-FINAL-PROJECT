@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'splash_screen.dart';
-import 'profile_screen.dart';
+import 'main_navigation_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -46,7 +46,7 @@ class HomeScreen extends StatelessWidget {
 
         final user = snapshot.data!;
 
-        // Load app user data if not loaded
+        // Load app user data if not already loaded
         WidgetsBinding.instance.addPostFrameCallback((_) {
           final provider = context.read<UserAuthProvider>();
           if (provider.appUser == null) {
@@ -54,7 +54,8 @@ class HomeScreen extends StatelessWidget {
           }
         });
 
-        return ProfileScreen(firebaseUser: user);
+        // Authenticated → show main navigation with bottom nav bar
+        return MainNavigationScreen(firebaseUser: user);
       },
     );
   }
