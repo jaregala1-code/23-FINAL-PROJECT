@@ -7,34 +7,49 @@ class FirebaseAuthAPI {
     return auth.authStateChanges();
   }
 
+  User? get currentUser => auth.currentUser;
+
   Future<String?> signIn(String email, String password) async {
     try {
       await auth.signInWithEmailAndPassword(email: email, password: password);
-      return null; // null means success
+      return null;
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
-        return 'No account found for that email.';
-      } else if (e.code == 'wrong-password') {
-        return 'Incorrect password.';
+      if (e.code == 'invalid-credential' ||
+          e.code == 'user-not-found' ||
+          e.code == 'wrong-password') {
+        return 'Invalid email or password.';
+      } else if (e.code == 'invalid-email') {
+        return 'Please enter a valid email address.';
+      } else if (e.code == 'too-many-requests') {
+        return 'Too many attempts. Please try again later.';
       }
-      return e.message;
+      return e.message ?? 'An error occurred. Please try again.';
     }
   }
 
-  Future<String?> signUp(String email, String password) async {
+  Future<String?> signUp(
+    String email,
+    String password, {
+    String? displayName,
+  }) async {
     try {
-      await auth.createUserWithEmailAndPassword(
+      final credential = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      if (displayName != null && displayName.isNotEmpty) {
+        await credential.user?.updateDisplayName(displayName);
+      }
       return null;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'weak-password') {
         return 'Password is too weak.';
       } else if (e.code == 'email-already-in-use') {
         return 'An account already exists for that email.';
+      } else if (e.code == 'invalid-email') {
+        return 'Please enter a valid email address.';
       }
-      return e.message;
+      return e.message ?? 'An error occurred. Please try again.';
     }
   }
 
