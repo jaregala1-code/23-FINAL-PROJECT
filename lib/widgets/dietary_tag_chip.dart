@@ -1,9 +1,17 @@
+// lib/widgets/dietary_tag_chip.dart
+
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../models/dietary_tag.dart';
+
+// Minimal interface — any object with these three fields works.
+abstract class TagLike {
+  String get id;
+  String get label;
+  String get emoji;
+}
 
 class DietaryTagChip extends StatelessWidget {
-  final DietaryTag tag;
+  final dynamic tag; // accepts DietaryTag, DietaryTagCompat, or any TagLike
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -34,7 +42,6 @@ class DietaryTagChip extends StatelessWidget {
                   BoxShadow(
                     color: AppColors.yellow.withOpacity(0.25),
                     blurRadius: 12,
-                    spreadRadius: 0,
                   ),
                 ]
               : [],
@@ -50,7 +57,6 @@ class DietaryTagChip extends StatelessWidget {
                 color: isSelected ? AppColors.black : AppColors.white,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                 fontSize: 13,
-                letterSpacing: 0.1,
               ),
             ),
           ],

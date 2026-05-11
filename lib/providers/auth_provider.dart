@@ -12,6 +12,10 @@ class UserAuthProvider with ChangeNotifier {
   AppUser? _appUser;
   bool _isLoading = false;
 
+  // Optional callback  set by whoever needs to react after login
+  // e.g. to load LocationProvider. Avoids circular provider dependencies.
+  void Function(String uid)? onUserLoaded;
+
   UserAuthProvider() {
     _authService = FirebaseAuthAPI();
     _firestoreService = FirestoreUserAPI();
@@ -31,6 +35,7 @@ class UserAuthProvider with ChangeNotifier {
   Future<void> loadAppUser(String uid) async {
     _appUser = await _firestoreService.getUser(uid);
     notifyListeners();
+    onUserLoaded?.call(uid);
   }
 
   Future<bool> signUp({
@@ -71,12 +76,13 @@ class UserAuthProvider with ChangeNotifier {
       firstName: firstName,
       lastName: lastName,
       displayName: displayName,
-      dietaryTags: dietaryTags,
+      foodTagIds: dietaryTags,
     );
 
     try {
       await _firestoreService.createUser(newUser);
       _appUser = newUser;
+      onUserLoaded?.call(uid);
     } catch (e) {
       _errorMessage = 'Failed to save profile. Please try again.';
       _isLoading = false;
