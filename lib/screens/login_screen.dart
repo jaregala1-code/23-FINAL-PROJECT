@@ -45,10 +45,13 @@ class _LoginScreenState extends State<LoginScreen>
       _emailCtrl.text.trim(),
       _passCtrl.text,
     );
+    if (!mounted) return;
     final err = context.read<UserAuthProvider>().error;
-    if (err != null && mounted) {
+    if (err != null) {
       _showError(err);
-      // Pop all the way back to home screen
+    } else {
+      // Successful sign-in — pop back to HomeScreen, which routes
+      // to MainNavigationScreen via the authenticated user stream.
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }

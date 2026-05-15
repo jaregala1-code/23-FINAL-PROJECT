@@ -84,7 +84,8 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(
-          _expirationDate ?? now.add(const Duration(hours: 8))),
+        _expirationDate ?? now.add(const Duration(hours: 8)),
+      ),
       builder: (ctx, child) => Theme(
         data: ThemeData.dark().copyWith(
           colorScheme: const ColorScheme.dark(
@@ -99,7 +100,12 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
     if (time == null || !mounted) return;
     setState(() {
       _expirationDate = DateTime(
-          date.year, date.month, date.day, time.hour, time.minute);
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 
@@ -137,20 +143,36 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
       tags: List<String>.from(_selectedTags),
     );
 
-    await context.read<PantryProvider>().postItem(item);
+    // Capture messenger & navigator before async gap so we don't look
+    // them up on a deactivated element after Navigator.pop().
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    final newId = await context.read<PantryProvider>().postItem(item);
+    if (!mounted) return;
     setState(() => _saving = false);
 
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (newId == null) {
+      messenger.showSnackBar(
         const SnackBar(
-          content: Text('🎉 Your item is now live in the Pantry!'),
-          backgroundColor: AppColors.green,
+          content: Text('Could not post your item. Please try again.'),
+          backgroundColor: AppColors.error,
           margin: EdgeInsets.all(16),
           behavior: SnackBarBehavior.floating,
         ),
       );
+      return;
     }
+
+    navigator.pop();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('🎉 Your item is now live in the Pantry!'),
+        backgroundColor: AppColors.green,
+        margin: EdgeInsets.all(16),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _snack(String msg) {
@@ -264,14 +286,17 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
                             : Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: const [
-                                  Icon(Icons.camera_alt_outlined,
-                                      size: 40,
-                                      color: AppColors.mutedText),
+                                  Icon(
+                                    Icons.camera_alt_outlined,
+                                    size: 40,
+                                    color: AppColors.mutedText,
+                                  ),
                                   SizedBox(height: 8),
                                   Text(
                                     'Tap to take a photo',
                                     style: TextStyle(
-                                        color: AppColors.mutedText),
+                                      color: AppColors.mutedText,
+                                    ),
                                   ),
                                   SizedBox(height: 4),
                                   Text(
@@ -322,7 +347,9 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.inputBg,
                           borderRadius: BorderRadius.circular(14),
@@ -330,8 +357,11 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today_outlined,
-                                size: 18, color: AppColors.mutedText),
+                            const Icon(
+                              Icons.calendar_today_outlined,
+                              size: 18,
+                              color: AppColors.mutedText,
+                            ),
                             const SizedBox(width: 10),
                             Text(
                               _expirationDate != null
@@ -370,7 +400,9 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 7),
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.yellow
@@ -385,8 +417,10 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(t.$1,
-                                    style: const TextStyle(fontSize: 13)),
+                                Text(
+                                  t.$1,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
                                 const SizedBox(width: 5),
                                 Text(
                                   t.$2,
