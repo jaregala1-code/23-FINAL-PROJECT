@@ -1,10 +1,11 @@
 // lib/screens/main_navigation_screen.dart
 //
-// Bottom nav now has 4 tabs:
-//   0 Pantry  (replaces DummyHomeScreen)
-//   1 Post    (CreatePostScreen)
-//   2 Inbox   (MessagesScreen)
-//   3 Profile (ProfileScreen)
+// 5-tab bottom nav:
+//   0  Pantry      (swipe feed)
+//   1  Tray        (receiver's pending + approved claims)
+//   2  Post        (add item / my listings)
+//   3  Messages    (chat list)
+//   4  Profile
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,8 +14,9 @@ import 'package:provider/provider.dart';
 import '../providers/pantry_provider.dart';
 import '../theme/app_theme.dart';
 import 'pantry/pantry_screen.dart';
+import 'pantry/tray_screen.dart';
 import 'pantry/add_item_screen.dart';
-import 'messages_screen.dart';
+import 'chat/chat_list_screen.dart';
 import 'profile_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -34,12 +36,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     _pages = [
       const PantryScreen(),
+      const TrayScreen(),
       const AddItemScreen(),
-      MessagesScreen(firebaseUser: widget.firebaseUser),
+      ChatListScreen(firebaseUser: widget.firebaseUser),
       ProfileScreen(firebaseUser: widget.firebaseUser),
     ];
 
-    // Start live Pantry feed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PantryProvider>().startListening();
     });
@@ -58,11 +60,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: _ElBitesNavBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (i) => setState(() => _currentIndex = i),
       ),
     );
   }
 }
+
+// ── Bottom nav bar ────────────────────────────────────────────────────────────
 
 class _ElBitesNavBar extends StatelessWidget {
   final int currentIndex;
@@ -72,9 +76,9 @@ class _ElBitesNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.cardBg,
-        border: const Border(top: BorderSide(color: AppColors.border)),
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: SafeArea(
         top: false,
@@ -90,26 +94,33 @@ class _ElBitesNavBar extends StatelessWidget {
                 onTap: () => onTap(0),
               ),
               _NavItem(
+                icon: Icons.shopping_basket_outlined,
+                activeIcon: Icons.shopping_basket_rounded,
+                label: 'Tray',
+                isActive: currentIndex == 1,
+                onTap: () => onTap(1),
+              ),
+              _NavItem(
                 icon: Icons.add_circle_outline_rounded,
                 activeIcon: Icons.add_circle_rounded,
                 label: 'Post',
-                isActive: currentIndex == 1,
-                onTap: () => onTap(1),
+                isActive: currentIndex == 2,
+                onTap: () => onTap(2),
                 isAccent: true,
               ),
               _NavItem(
-                icon: Icons.inbox_outlined,
-                activeIcon: Icons.inbox_rounded,
-                label: 'Inbox',
-                isActive: currentIndex == 2,
-                onTap: () => onTap(2),
+                icon: Icons.chat_bubble_outline_rounded,
+                activeIcon: Icons.chat_bubble_rounded,
+                label: 'Messages',
+                isActive: currentIndex == 3,
+                onTap: () => onTap(3),
               ),
               _NavItem(
                 icon: Icons.person_outline_rounded,
                 activeIcon: Icons.person_rounded,
                 label: 'Profile',
-                isActive: currentIndex == 3,
-                onTap: () => onTap(3),
+                isActive: currentIndex == 4,
+                onTap: () => onTap(4),
               ),
             ],
           ),
@@ -150,15 +161,16 @@ class _NavItem extends StatelessWidget {
             Icon(
               isActive ? activeIcon : icon,
               color: isActive ? activeColor : AppColors.mutedText,
-              size: 24,
+              size: 22,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
                 color: isActive ? activeColor : AppColors.mutedText,
                 fontSize: 10,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                fontFamily: 'Sora',
               ),
             ),
           ],

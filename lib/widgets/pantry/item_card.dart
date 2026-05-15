@@ -3,14 +3,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
 import '../../models/surplus_item.dart';
 import '../../providers/pantry_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../screens/pantry/add_item_screen.dart';
 import '../../theme/app_theme.dart';
 import 'base64_image.dart';
 import 'item_status_chip.dart';
+import '../../screens/pantry/create_listing_sheet.dart';
 
 class ItemCard extends StatelessWidget {
   const ItemCard({super.key, required this.item});
@@ -154,11 +153,11 @@ class _ItemActions extends StatelessWidget {
     children: [
       Expanded(
         child: OutlinedButton.icon(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AddItemScreen(existingItem: item),
-            ),
+          onPressed: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => const CreateListingSheet(),
           ),
           icon: const Icon(
             Icons.edit_outlined,

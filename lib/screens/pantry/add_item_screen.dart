@@ -1,320 +1,265 @@
 // lib/screens/pantry/add_item_screen.dart
 //
-// Create / edit a surplus item. Adapted to ELBites dark theme.
+// "Post" tab — shows the Giver's active listings first,
+// then a "+ Post New Item" button at bottom.
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
+import 'package:intl/intl.dart';
 import '../../models/surplus_item.dart';
 import '../../providers/pantry_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/pantry_service.dart';
+import '../../services/claim_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/pantry/base64_image.dart';
+import '../../widgets/pantry/item_status_chip.dart';
+import '../qr/qr_scanner_screen.dart';
+import 'requesters_page.dart';
+import 'create_listing_sheet.dart';
 
-class AddItemScreen extends StatefulWidget {
-  const AddItemScreen({super.key, this.existingItem});
-  final SurplusItem? existingItem;
-
-  @override
-  State<AddItemScreen> createState() => _AddItemScreenState();
-}
-
-class _AddItemScreenState extends State<AddItemScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  final _qtyCtrl = TextEditingController();
-
-  String? _photoBase64;
-  DateTime? _expirationDate;
-  bool _saving = false;
-
-  bool get _isEdit => widget.existingItem != null;
+class AddItemScreen extends StatelessWidget {
+  const AddItemScreen({super.key});
 
   @override
-  void initState() {
-    super.initState();
-    final e = widget.existingItem;
-    if (e != null) {
-      _titleCtrl.text = e.title;
-      _descCtrl.text = e.description;
-      _qtyCtrl.text = e.quantity;
-      _photoBase64 = e.photoBase64;
-      _expirationDate = e.expirationDate;
-    }
-  }
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<UserAuthProvider>();
+    final userProvider = context.watch<UserProvider>();
+    final myUid =
+        authProvider.appUser?.uid ?? userProvider.user?.uid ?? '';
+    final pantry = context.watch<PantryProvider>();
 
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _descCtrl.dispose();
-    _qtyCtrl.dispose();
-    super.dispose();
-  }
+    final myItems =
+        pantry.items.where((i) => i.ownerUid == myUid).toList();
+    final active = myItems.where((i) => i.status == ItemStatus.available).toList();
+    final reserved = myItems.where((i) => i.status == ItemStatus.reserved).toList();
+    final completed = myItems.where((i) => i.status == ItemStatus.completed).toList();
 
-  Future<void> _capturePhoto() async {
-    final b64 = await PantryService.instance.captureItemPhoto();
-    if (b64 != null) setState(() => _photoBase64 = b64);
-  }
-
-  Future<void> _pickExpiry() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _expirationDate ?? now.add(const Duration(days: 2)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.yellow,
-            onPrimary: AppColors.black,
-            surface: AppColors.cardBg,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => _expirationDate = picked);
-  }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_photoBase64 == null) {
-      _snack('Please take a photo of the item.');
-      return;
-    }
-    if (_expirationDate == null) {
-      _snack('Please set an expiration date.');
-      return;
-    }
-
-    setState(() => _saving = true);
-
-    final appUser = context.read<UserProvider>().user;
-    if (appUser == null) {
-      _snack('You must be logged in to post items.');
-      setState(() => _saving = false);
-      return;
-    }
-
-    final item = SurplusItem(
-      id: widget.existingItem?.id,
-      title: _titleCtrl.text.trim(),
-      description: _descCtrl.text.trim(),
-      quantity: _qtyCtrl.text.trim(),
-      expirationDate: _expirationDate!,
-      photoBase64: _photoBase64!,
-      ownerUid: appUser.uid,
-      ownerName: appUser.displayName.isNotEmpty
-          ? appUser.displayName
-          : appUser.email,
-      tags: appUser.foodTagIds,
-    );
-
-    final pantry = context.read<PantryProvider>();
-    if (_isEdit) {
-      await pantry.updateItem(widget.existingItem!.id!, item.toFirestore());
-    } else {
-      await pantry.postItem(item);
-    }
-
-    setState(() => _saving = false);
-    if (mounted) Navigator.pop(context);
-  }
-
-  void _snack(String msg) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(msg)));
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
+    return Scaffold(
+      backgroundColor: AppColors.darkBg,
+      appBar: AppBar(
         backgroundColor: AppColors.darkBg,
-        appBar: AppBar(
-          backgroundColor: AppColors.darkBg,
-          title: Text(
-            _isEdit ? 'Edit Item' : 'Share Surplus Food',
-            style: const TextStyle(
-              color: AppColors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          iconTheme: const IconThemeData(color: AppColors.white),
+        title: const Text('My Pantry'),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openCreateSheet(context),
+        backgroundColor: AppColors.yellow,
+        foregroundColor: AppColors.black,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'Post Food',
+          style: TextStyle(fontWeight: FontWeight.w700),
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      body: myItems.isEmpty
+          ? _buildEmpty(context)
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
-                // Photo
-                _PhotoPicker(base64: _photoBase64, onTap: _capturePhoto),
-                const SizedBox(height: 20),
-
-                // Title
-                _Label('Item Name'),
-                _DarkField(
-                  controller: _titleCtrl,
-                  hint: 'e.g. 3 extra Eggs',
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Enter an item name' : null,
-                ),
-                const SizedBox(height: 16),
-
-                // Quantity
-                _Label('Quantity / Amount'),
-                _DarkField(
-                  controller: _qtyCtrl,
-                  hint: 'e.g. Half a bag, 3 pieces',
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Enter a quantity' : null,
-                ),
-                const SizedBox(height: 16),
-
-                // Description
-                _Label('Description (optional)'),
-                _DarkField(
-                  controller: _descCtrl,
-                  hint: 'Storage tips, pickup notes…',
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-
-                // Expiry
-                _Label('Expiration Date'),
-                GestureDetector(
-                  onTap: _pickExpiry,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.inputBg,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today,
-                            size: 18, color: AppColors.mutedText),
-                        const SizedBox(width: 10),
-                        Text(
-                          _expirationDate != null
-                              ? DateFormat('MMMM d, yyyy')
-                                  .format(_expirationDate!)
-                              : 'Select expiration date',
-                          style: TextStyle(
-                            color: _expirationDate != null
-                                ? AppColors.white
-                                : AppColors.mutedText,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : _save,
-                    child: _saving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: AppColors.black),
-                          )
-                        : Text(_isEdit ? 'Update Item' : 'Post Item 🥡'),
-                  ),
-                ),
+                if (active.isNotEmpty) ...[
+                  _SectionHeader('Active (${active.length})'),
+                  ...active.map((i) => _ListingCard(item: i)),
+                ],
+                if (reserved.isNotEmpty) ...[
+                  _SectionHeader('Reserved (${reserved.length})'),
+                  ...reserved.map((i) => _ListingCard(item: i)),
+                ],
+                if (completed.isNotEmpty) ...[
+                  _SectionHeader('Completed (${completed.length})'),
+                  ...completed.map((i) => _ListingCard(item: i)),
+                ],
               ],
             ),
-          ),
+    );
+  }
+
+  Widget _buildEmpty(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('🍱', style: TextStyle(fontSize: 64)),
+            const SizedBox(height: 20),
+            const Text(
+              'Nothing posted yet',
+              style: TextStyle(
+                color: AppColors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Share your surplus food with the Elbi community!',
+              style: TextStyle(
+                color: AppColors.mutedText,
+                fontSize: 14,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: () => _openCreateSheet(context),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Post Your First Item'),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
+
+  void _openCreateSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const CreateListingSheet(),
+    );
+  }
 }
 
-// ── Sub-widgets ───────────────────────────────────────────────────────────────
-
-class _Label extends StatelessWidget {
-  const _Label(this.text);
+class _SectionHeader extends StatelessWidget {
   final String text;
+  const _SectionHeader(this.text);
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: AppColors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 12),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.mutedText,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.0,
         ),
-      );
+      ),
+    );
+  }
 }
 
-class _DarkField extends StatelessWidget {
-  const _DarkField({
-    required this.controller,
-    this.hint,
-    this.validator,
-    this.maxLines = 1,
-  });
-  final TextEditingController controller;
-  final String? hint;
-  final String? Function(String?)? validator;
-  final int maxLines;
+class _ListingCard extends StatelessWidget {
+  final SurplusItem item;
+  const _ListingCard({required this.item});
 
   @override
-  Widget build(BuildContext context) => TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        style: const TextStyle(color: AppColors.white, fontSize: 15),
-        decoration: InputDecoration(hintText: hint),
-        validator: validator,
-      );
-}
+  Widget build(BuildContext context) {
+    final isActive = item.status == ItemStatus.available;
+    final isReserved = item.status == ItemStatus.reserved;
 
-class _PhotoPicker extends StatelessWidget {
-  const _PhotoPicker({required this.base64, required this.onTap});
-  final String? base64;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: base64 != null
-              ? Base64Image(
-                  base64: base64!,
-                  borderRadius: BorderRadius.circular(13),
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+    return GestureDetector(
+      onTap: () {
+        if (isActive && item.id != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => RequestersPage(item: item)),
+          );
+        } else if (isReserved) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => QRScannerScreen(item: item)),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Photo
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: item.photoBase64.isNotEmpty
+                    ? Base64Image(
+                        base64: item.photoBase64,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: 72,
+                        height: 72,
+                        color: AppColors.cardBg2,
+                        child: const Center(
+                          child: Text('🍽️',
+                              style: TextStyle(fontSize: 28)),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.camera_alt,
-                        size: 40, color: AppColors.mutedText),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tap to take a photo',
-                      style: const TextStyle(color: AppColors.mutedText),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: const TextStyle(
+                              color: AppColors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        ItemStatusChip(status: item.status),
+                      ],
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.quantity,
+                      style: const TextStyle(
+                          color: AppColors.mutedText, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Expires ${DateFormat('MMM d').format(item.expirationDate)}',
+                      style: const TextStyle(
+                          color: AppColors.mutedText, fontSize: 12),
+                    ),
+                    if (isActive) ...[
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Tap to view requesters →',
+                        style: TextStyle(
+                          color: AppColors.yellow,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ] else if (isReserved) ...[
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Tap to scan QR Code →',
+                        style: TextStyle(
+                          color: AppColors.green,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
+  }
 }

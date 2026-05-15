@@ -10,6 +10,7 @@ import 'providers/location_provider.dart';
 import 'providers/pantry_provider.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
+import 'providers/chat_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => PantryProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: Builder(
         builder: (context) {

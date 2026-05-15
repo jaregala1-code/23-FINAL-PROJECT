@@ -1,3 +1,5 @@
+// lib/theme/app_theme.dart
+
 import 'package:flutter/material.dart';
 
 class AppColors {
@@ -12,6 +14,7 @@ class AppColors {
   static const Color mutedText = Color(0xFF888888);
   static const Color border = Color(0xFF2e2e2e);
   static const Color inputBg = Color(0xFF1a1a1a);
+  static const Color error = Color(0xFFcf6679);
 }
 
 class AppTheme {
@@ -24,7 +27,7 @@ class AppTheme {
         primary: AppColors.green,
         secondary: AppColors.yellow,
         surface: AppColors.cardBg,
-        error: Color(0xFFcf6679),
+        error: AppColors.error,
       ),
       fontFamily: 'Sora',
       textTheme: const TextTheme(
@@ -61,8 +64,24 @@ class AppTheme {
             fontWeight: FontWeight.w700,
             fontSize: 16,
             letterSpacing: 0.2,
+            fontFamily: 'Sora',
           ),
           elevation: 0,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.white,
+          side: const BorderSide(color: AppColors.border, width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(50),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            fontFamily: 'Sora',
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -82,20 +101,17 @@ class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFcf6679)),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFcf6679), width: 1.5),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
-        labelStyle: const TextStyle(color: AppColors.mutedText),
-        hintStyle: const TextStyle(color: AppColors.mutedText),
+        labelStyle: const TextStyle(color: AppColors.mutedText, fontFamily: 'Sora'),
+        hintStyle: const TextStyle(color: AppColors.mutedText, fontFamily: 'Sora'),
         prefixIconColor: AppColors.mutedText,
         suffixIconColor: AppColors.mutedText,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 16,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.darkBg,
@@ -105,7 +121,26 @@ class AppTheme {
           color: AppColors.white,
           fontWeight: FontWeight.w700,
           fontSize: 18,
+          fontFamily: 'Sora',
         ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.cardBg2,
+        labelStyle: const TextStyle(
+          color: AppColors.white,
+          fontSize: 12,
+          fontFamily: 'Sora',
+        ),
+        side: const BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      ),
+      dividerTheme: const DividerThemeData(color: AppColors.border, space: 1),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.cardBg,
+        contentTextStyle: const TextStyle(color: AppColors.white, fontFamily: 'Sora'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

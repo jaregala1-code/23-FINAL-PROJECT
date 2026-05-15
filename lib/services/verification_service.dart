@@ -28,7 +28,7 @@ class VerificationService {
 
       await _db.collection('users').doc(uid).set({
         'verificationSelfieBase64': base64,
-        'verificationStatus': VerificationStatus.pending.name,
+        'verificationStatus': VerificationStatus.verified.name,
         'verificationSubmittedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
