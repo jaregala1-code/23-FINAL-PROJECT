@@ -2,7 +2,6 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -108,7 +107,7 @@ class ImageService {
       final doc = await _db.collection(collection).doc(documentId).get();
       if (!doc.exists) return null;
 
-      final raw = (doc.data() as Map<String, dynamic>?)?[fieldName] as String?;
+      final raw = (doc.data())?[fieldName] as String?;
       if (raw == null || raw.isEmpty) return null;
 
       return decode(raw);
@@ -126,7 +125,7 @@ class ImageService {
   }) {
     return _db.collection(collection).doc(documentId).snapshots().map((snap) {
       if (!snap.exists) return null;
-      final raw = (snap.data() as Map<String, dynamic>?)?[fieldName] as String?;
+      final raw = (snap.data())?[fieldName] as String?;
       if (raw == null || raw.isEmpty) return null;
       return decode(raw);
     });

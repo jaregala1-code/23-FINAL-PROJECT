@@ -2,7 +2,6 @@
 //
 // Receiver shows this QR at pickup. Dark background, centered QR.
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../theme/app_theme.dart';
@@ -44,7 +43,7 @@ class QRDisplayScreen extends StatelessWidget {
               Text(
                 'Show this to your Giver',
                 style: TextStyle(
-                  color: AppColors.white.withOpacity(0.7),
+                  color: AppColors.white.withValues(alpha: 0.7),
                   fontSize: 16,
                 ),
                 textAlign: TextAlign.center,
@@ -79,10 +78,10 @@ class QRDisplayScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.white.withOpacity(0.08),
+                  color: AppColors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: AppColors.white.withOpacity(0.15),
+                    color: AppColors.white.withValues(alpha: 0.15),
                   ),
                 ),
                 child: Column(
@@ -100,7 +99,7 @@ class QRDisplayScreen extends StatelessWidget {
                     Text(
                       'Pickup from $ownerName',
                       style: TextStyle(
-                        color: AppColors.white.withOpacity(0.6),
+                        color: AppColors.white.withValues(alpha: 0.6),
                         fontSize: 13,
                       ),
                     ),
@@ -118,7 +117,7 @@ class QRDisplayScreen extends StatelessWidget {
                   Text(
                     'Unique code — only show at the pickup location',
                     style: TextStyle(
-                      color: AppColors.white.withOpacity(0.5),
+                      color: AppColors.white.withValues(alpha: 0.5),
                       fontSize: 12,
                     ),
                   ),

@@ -59,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen>
                     'Share what you have.\nNourish your community.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: AppColors.white.withOpacity(0.55),
+                      color: AppColors.white.withValues(alpha: 0.55),
                       fontSize: 16,
                       height: 1.55,
                       fontWeight: FontWeight.w400,
@@ -205,7 +205,7 @@ class _MiniCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: AppColors.green.withOpacity(0.15),
+                color: AppColors.green.withValues(0.15),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
@@ -239,7 +239,7 @@ class _MiniCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: AppColors.green.withOpacity(0.18),
+                color: AppColors.green.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(

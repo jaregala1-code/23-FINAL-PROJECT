@@ -75,7 +75,7 @@ class ChatListScreen extends StatelessWidget {
 
           return ListView.separated(
             itemCount: chats.length,
-            separatorBuilder: (_, __) =>
+            separatorBuilder: (_, _) =>
                 const Divider(height: 1, color: AppColors.border),
             itemBuilder: (context, i) {
               final chat = chats[i];
@@ -105,7 +105,7 @@ class ChatListScreen extends StatelessWidget {
                       // Avatar
                       CircleAvatar(
                         radius: 26,
-                        backgroundColor: AppColors.green.withOpacity(0.15),
+                        backgroundColor: AppColors.green.withValues(alpha: 0.15),
                         child: Text(
                           otherName.isNotEmpty
                               ? otherName[0].toUpperCase()

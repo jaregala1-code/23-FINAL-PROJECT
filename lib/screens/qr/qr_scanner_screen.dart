@@ -176,8 +176,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (_success ? AppColors.green : AppColors.error)
-                    .withOpacity(0.15),
+                color: (_success ? AppColors.green : AppColors.error).withValues(alpha: 0.15),
               ),
               child: Icon(
                 _success
@@ -247,7 +246,7 @@ class _ScanOverlay extends StatelessWidget {
 class _OverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(0.55);
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.55);
     final cutW = size.width * 0.7;
     final cutH = cutW;
     final left = (size.width - cutW) / 2;

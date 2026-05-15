@@ -267,7 +267,7 @@ class _RadiusSlider extends StatelessWidget {
             activeTrackColor: AppColors.yellow,
             thumbColor: AppColors.yellow,
             inactiveTrackColor: AppColors.border,
-            overlayColor: AppColors.yellow.withOpacity(0.12),
+            overlayColor: AppColors.yellow.withValues(alpha: 0.12),
             trackHeight: 4,
           ),
           child: Slider(

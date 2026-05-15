@@ -95,10 +95,10 @@ class FoodDetailSheet extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: AppColors.green.withOpacity(0.15),
+                                  color: AppColors.green.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                      color: AppColors.green.withOpacity(0.4)),
+                                      color: AppColors.green.withValues(alpha: 0.4)),
                                 ),
                                 child: Text(
                                   item.quantity,
@@ -179,7 +179,7 @@ class FoodDetailSheet extends StatelessWidget {
                               CircleAvatar(
                                 radius: 22,
                                 backgroundColor:
-                                    AppColors.green.withOpacity(0.15),
+                                    AppColors.green.withValues(alpha:0.15),
                                 child: Text(
                                   item.ownerName.isNotEmpty
                                       ? item.ownerName[0].toUpperCase()

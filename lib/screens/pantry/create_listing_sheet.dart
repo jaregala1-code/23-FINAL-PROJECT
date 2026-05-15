@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../models/surplus_item.dart';
-import '../../models/app_user.dart';
 import '../../providers/pantry_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';

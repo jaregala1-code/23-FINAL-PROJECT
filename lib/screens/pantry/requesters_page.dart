@@ -198,7 +198,7 @@ class _RequesterCard extends StatelessWidget {
           // Avatar
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppColors.green.withOpacity(0.15),
+            backgroundColor: AppColors.green.withValues(alpha: 0.15),
             child: photo != null
                 ? ClipOval(
                     child: Base64Image(

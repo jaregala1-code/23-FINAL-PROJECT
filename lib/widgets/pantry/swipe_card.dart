@@ -1,8 +1,6 @@
 // lib/widgets/pantry/swipe_card.dart
 
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../models/surplus_item.dart';
 import '../../theme/app_theme.dart';
 import 'base64_image.dart';
@@ -133,10 +131,10 @@ class SwipeCard extends StatelessWidget {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Text(
@@ -214,7 +212,7 @@ class SwipeCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isAlmostGone
                       ? AppColors.orange
-                      : Colors.white.withOpacity(0.15),
+                      : Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -243,7 +241,7 @@ class SwipeCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.green.withOpacity(0.85),
+                  color: AppColors.green.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
