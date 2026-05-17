@@ -243,7 +243,7 @@ class ProfileScreen extends StatelessWidget {
                         gradient: LinearGradient(
                           colors: [
                             AppColors.orange.withValues(alpha: 0.12),
-                            // AppColors.yellow.withValues(0.08),
+                            AppColors.yellow.withValues(alpha: 0.08),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(18),

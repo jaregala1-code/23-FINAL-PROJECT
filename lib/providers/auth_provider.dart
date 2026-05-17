@@ -96,16 +96,20 @@ class UserAuthProvider with ChangeNotifier {
   }
 
   Future<void> signIn(String email, String password) async {
+    final t = Stopwatch()..start();
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     _errorMessage = await _authService.signIn(email, password);
+    debugPrint('⏱  authService.signIn: ${t.elapsedMilliseconds} ms');
+    t.reset();
 
     if (_errorMessage == null) {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
         await loadAppUser(uid);
+        debugPrint('⏱  loadAppUser: ${t.elapsedMilliseconds} ms');
       }
     }
 
