@@ -1,5 +1,6 @@
 // lib/screens/signup_screen.dart
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -8,6 +9,7 @@ import '../models/app_user.dart';
 import '../widgets/elbites_logo.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/dietary_tag_chip.dart';
+import 'main_navigation_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -92,12 +94,20 @@ class _SignupScreenState extends State<SignupScreen>
       displayName: _displayCtrl.text.trim(),
       dietaryTags: _selectedTags.toList(),
     );
-    if (!success && mounted) {
+    if (!mounted) return;
+    if (!success) {
       final err = context.read<UserAuthProvider>().error;
       if (err != null) _showError(err);
-    } else if (success && mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
     }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => MainNavigationScreen(firebaseUser: user),
+      ),
+      (route) => false,
+    );
   }
 
   void _showError(String msg) {

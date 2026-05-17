@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/elbites_logo.dart';
 import '../widgets/app_text_field.dart';
+import 'main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -49,11 +51,16 @@ class _LoginScreenState extends State<LoginScreen>
     final err = context.read<UserAuthProvider>().error;
     if (err != null) {
       _showError(err);
-    } else {
-      // Successful sign-in — pop back to HomeScreen, which routes
-      // to MainNavigationScreen via the authenticated user stream.
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      return;
     }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => MainNavigationScreen(firebaseUser: user),
+      ),
+      (route) => false,
+    );
   }
 
   void _showError(String msg) {

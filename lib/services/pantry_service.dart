@@ -1,6 +1,5 @@
 // lib/services/pantry_service.dart
 
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -33,7 +32,15 @@ class PantryService {
 
   Future<String?> postItem(SurplusItem item) async {
     try {
-      final ref = await _db.collection(_col).add(item.toFirestore());
+      // Generate the doc ref locally so we can return its id immediately.
+      // We don't await the server commit — Firestore's offline cache fires
+      // snapshot listeners right away, so the UI sees the new item without
+      // waiting for the network roundtrip (which made the "Post" spinner
+      // hang long after the item was already in the feed).
+      final ref = _db.collection(_col).doc();
+      ref.set(item.toFirestore()).catchError((e) {
+        debugPrint('[PantryService] postItem write error: $e');
+      });
       return ref.id;
     } catch (e) {
       debugPrint('[PantryService] postItem error: $e');
