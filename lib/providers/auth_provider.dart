@@ -118,9 +118,11 @@ class UserAuthProvider with ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _authService.signOut();
     _appUser = null;
+    _errorMessage = null;
+    _isLoading = false;
     notifyListeners();
+    await _authService.signOut();
   }
 
   void clearError() {

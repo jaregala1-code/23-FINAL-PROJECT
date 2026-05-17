@@ -10,6 +10,7 @@ import '../models/app_user.dart';
 import '../widgets/dietary_tag_chip.dart';
 import '../widgets/pantry/base64_image.dart';
 import 'profile/profile_settings_screen.dart';
+import '../providers/pantry_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   final User firebaseUser;
@@ -52,9 +53,12 @@ class ProfileScreen extends StatelessWidget {
                   size: 20,
                 ),
                 tooltip: 'Sign out',
-                onPressed: () {
-                  context.read<UserAuthProvider>().signOut();
+                onPressed: () async {
+                  // Stop the pantry stream FIRST so it doesn't fire
+                  // PERMISSION_DENIED errors against the new no-auth state.
+                  context.read<PantryProvider>().stopListening();
                   context.read<UserProvider>().clear();
+                  await context.read<UserAuthProvider>().signOut();
                 },
               ),
             ],
