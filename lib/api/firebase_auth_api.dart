@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 class FirebaseAuthAPI {
   static final FirebaseAuth auth = FirebaseAuth.instance;
@@ -37,8 +38,13 @@ class FirebaseAuthAPI {
         email: email,
         password: password,
       );
+      // Fire-and-forget the display-name update — it's a separate network
+      // roundtrip and the signup flow already has everything it needs
+      // (uid + email). Waiting for it just makes "Join ELBites" hang.
       if (displayName != null && displayName.isNotEmpty) {
-        await credential.user?.updateDisplayName(displayName);
+        credential.user?.updateDisplayName(displayName).catchError((e) {
+          debugPrint('[FirebaseAuthAPI] updateDisplayName error: $e');
+        });
       }
       return null;
     } on FirebaseAuthException catch (e) {
