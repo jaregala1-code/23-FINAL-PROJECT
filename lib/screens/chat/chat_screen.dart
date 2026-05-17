@@ -23,6 +23,16 @@ class _ChatScreenState extends State<ChatScreen> {
   final _msgCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
 
+  // Cache the Firestore stream so rebuilds don't re-subscribe and flash
+  // the loading state every time a provider notifies.
+  Stream<List<ChatMessage>>? _messagesStream;
+
+  Stream<List<ChatMessage>> _ensureMessagesStream() {
+    return _messagesStream ??= context.read<ChatProvider>().getMessagesStream(
+      widget.chat.id,
+    );
+  }
+
   @override
   void dispose() {
     _msgCtrl.dispose();
@@ -62,7 +72,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = context.watch<ChatProvider>();
     final otherName = widget.chat.getOtherName(widget.myUid);
 
     return Scaffold(
@@ -119,7 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Messages list
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
-              stream: chatProvider.getMessagesStream(widget.chat.id),
+              stream: _ensureMessagesStream(),
               builder: (context, snapshot) {
                 final messages = snapshot.data ?? [];
 

@@ -11,17 +11,32 @@ import '../../providers/chat_provider.dart';
 import '../../theme/app_theme.dart';
 import 'chat_screen.dart';
 
-class ChatListScreen extends StatelessWidget {
+class ChatListScreen extends StatefulWidget {
   final User firebaseUser;
   const ChatListScreen({super.key, required this.firebaseUser});
 
   @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  Stream<List<Chat>>? _chatsStream;
+  String? _streamedUid;
+
+  Stream<List<Chat>> _ensureStream(BuildContext context, String uid) {
+    if (_chatsStream != null && _streamedUid == uid) return _chatsStream!;
+    _streamedUid = uid;
+    _chatsStream = context.read<ChatProvider>().getChatsStream(uid);
+    return _chatsStream!;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<UserAuthProvider>();
-    final myUid = authProvider.appUser?.uid ??
+    final myUid =
+        authProvider.appUser?.uid ??
         context.watch<UserProvider>().user?.uid ??
-        firebaseUser.uid;
-    final chatProvider = context.watch<ChatProvider>();
+        widget.firebaseUser.uid;
 
     return Scaffold(
       backgroundColor: AppColors.darkBg,
@@ -30,7 +45,7 @@ class ChatListScreen extends StatelessWidget {
         title: const Text('Messages'),
       ),
       body: StreamBuilder<List<Chat>>(
-        stream: chatProvider.getChatsStream(myUid),
+        stream: _ensureStream(context, myUid),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -89,10 +104,7 @@ class ChatListScreen extends StatelessWidget {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ChatScreen(
-                      chat: chat,
-                      myUid: myUid,
-                    ),
+                    builder: (_) => ChatScreen(chat: chat, myUid: myUid),
                   ),
                 ),
                 child: Padding(
@@ -105,7 +117,9 @@ class ChatListScreen extends StatelessWidget {
                       // Avatar
                       CircleAvatar(
                         radius: 26,
-                        backgroundColor: AppColors.green.withValues(alpha: 0.15),
+                        backgroundColor: AppColors.green.withValues(
+                          alpha: 0.15,
+                        ),
                         child: Text(
                           otherName.isNotEmpty
                               ? otherName[0].toUpperCase()
