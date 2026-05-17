@@ -77,7 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor: AppColors.green.withValues(0.15),
+              backgroundColor: AppColors.green.withValues(alpha: 0.15),
               child: Text(
                 otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
                 style: const TextStyle(
@@ -138,8 +138,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (_scrollCtrl.hasClients) {
-                    _scrollCtrl.jumpTo(
-                        _scrollCtrl.position.maxScrollExtent);
+                    _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
                   }
                 });
 
@@ -158,10 +157,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
 
           // Input bar
-          _InputBar(
-            controller: _msgCtrl,
-            onSend: _send,
-          ),
+          _InputBar(controller: _msgCtrl, onSend: _send),
         ],
       ),
     );
@@ -179,14 +175,15 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
             CircleAvatar(
               radius: 13,
-              backgroundColor: AppColors.green.withValues(0.2),
+              backgroundColor: AppColors.green.withValues(alpha: 0.2),
               child: Text(
                 msg.senderName.isNotEmpty
                     ? msg.senderName[0].toUpperCase()
@@ -255,7 +252,11 @@ class _InputBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 10, 16, 16 + MediaQuery.of(context).padding.bottom),
+        16,
+        10,
+        16,
+        16 + MediaQuery.of(context).padding.bottom,
+      ),
       decoration: const BoxDecoration(
         color: AppColors.cardBg,
         border: Border(top: BorderSide(color: AppColors.border)),
@@ -278,7 +279,9 @@ class _InputBar extends StatelessWidget {
                   borderSide: BorderSide.none,
                 ),
                 contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
+                  horizontal: 16,
+                  vertical: 10,
+                ),
               ),
               onSubmitted: (_) => onSend(),
             ),
@@ -293,8 +296,11 @@ class _InputBar extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: AppColors.green,
               ),
-              child: const Icon(Icons.send_rounded,
-                  color: AppColors.white, size: 20),
+              child: const Icon(
+                Icons.send_rounded,
+                color: AppColors.white,
+                size: 20,
+              ),
             ),
           ),
         ],

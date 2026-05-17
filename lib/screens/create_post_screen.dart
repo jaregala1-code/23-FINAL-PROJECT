@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
@@ -109,9 +110,15 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     setState(() => _isSubmitting = true);
 
     final uid = context.read<UserAuthProvider>().appUser?.uid ?? '';
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
-    // Build the post map
+    final items = FirebaseFirestore.instance.collection('items');
+    // Generate the ref up-front so we can write the id into the doc.
+    final docRef = items.doc();
+
     final postData = {
+      'id': docRef.id,
       'ownerUid': uid,
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim(),
@@ -119,37 +126,40 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       'location': _locationController.text.trim(),
       'notes': _notesController.text.trim(),
       'dietaryTags': _selectedTags,
-      'availableFrom': _availableFrom!.toIso8601String(),
-      'availableUntil': _availableUntil?.toIso8601String(),
+      'availableFrom': Timestamp.fromDate(_availableFrom!),
+      'availableUntil': _availableUntil != null
+          ? Timestamp.fromDate(_availableUntil!)
+          : null,
       'status': 'available',
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': FieldValue.serverTimestamp(),
     };
 
-  
-
-    // TODO: Save postData to Firestore "items" collection.
-    // Example:
-    //   final docRef = await FirebaseFirestore.instance
-    //       .collection('items')
-    //       .add(postData);
-    //
-    // After saving, optionally navigate back or show a success screen:
-    //   Navigator.of(context).pop();
-    //   _showSnack('Your post is live!');
-    //
-    // Make sure to add an 'id' field after you get the docRef:
-    //   await docRef.update({'id': docRef.id});
-
-    // Simulate a brief loading delay (remove when Firestore is wired up)
-    await Future.delayed(const Duration(milliseconds: 800));
+    // Fire-and-forget the server commit: Firestore's local cache fires
+    // snapshot listeners immediately, so feeds update without waiting on
+    // the network roundtrip (and the spinner doesn't hang post-write).
+    docRef.set(postData).catchError((e) {
+      debugPrint('[CreatePost] write error: $e');
+    });
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
-
-    _showSnack(
-      '✅ Post ready! (Firestore save is TODO — see comments in create_post_screen.dart)',
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text(
+          '🎉 Your post is live!',
+          style: TextStyle(color: AppColors.black, fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: AppColors.yellow,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
     );
-    _resetForm();
+    if (navigator.canPop()) {
+      navigator.pop();
+    } else {
+      _resetForm();
+    }
   }
 
   void _resetForm() {
