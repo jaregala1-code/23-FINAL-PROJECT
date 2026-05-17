@@ -125,6 +125,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       'createdAt': DateTime.now().toIso8601String(),
     };
 
+  
+
     // TODO: Save postData to Firestore "items" collection.
     // Example:
     //   final docRef = await FirebaseFirestore.instance
@@ -451,7 +453,7 @@ class _DateTimeTile extends StatelessWidget {
             color: required && value == null
                 ? AppColors.border
                 : (value != null
-                      ? AppColors.green.withOpacity(0.5)
+                      ? AppColors.green.withValues(alpha: 0.5)
                       : AppColors.border),
           ),
         ),

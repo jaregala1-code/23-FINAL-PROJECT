@@ -40,7 +40,7 @@ class DietaryTagChip extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.yellow.withOpacity(0.25),
+                    color: AppColors.yellow.withValues(alpha: 0.25),
                     blurRadius: 12,
                   ),
                 ]

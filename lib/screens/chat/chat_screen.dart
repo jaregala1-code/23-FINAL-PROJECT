@@ -77,7 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor: AppColors.green.withOpacity(0.15),
+              backgroundColor: AppColors.green.withValues(0.15),
               child: Text(
                 otherName.isNotEmpty ? otherName[0].toUpperCase() : '?',
                 style: const TextStyle(
@@ -186,7 +186,7 @@ class _MessageBubble extends StatelessWidget {
           if (!isMe) ...[
             CircleAvatar(
               radius: 13,
-              backgroundColor: AppColors.green.withOpacity(0.2),
+              backgroundColor: AppColors.green.withValues(0.2),
               child: Text(
                 msg.senderName.isNotEmpty
                     ? msg.senderName[0].toUpperCase()
@@ -231,7 +231,7 @@ class _MessageBubble extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       color: isMe
-                          ? AppColors.white.withOpacity(0.65)
+                          ? AppColors.white.withValues(alpha: 0.65)
                           : AppColors.mutedText,
                     ),
                   ),

@@ -10,8 +10,6 @@ import '../../models/surplus_item.dart';
 import '../../providers/pantry_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../services/pantry_service.dart';
-import '../../services/claim_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/pantry/base64_image.dart';
 import '../../widgets/pantry/item_status_chip.dart';

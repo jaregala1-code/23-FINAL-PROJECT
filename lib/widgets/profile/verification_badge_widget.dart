@@ -14,9 +14,9 @@ class VerificationBadgeWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: cfg.color.withOpacity(0.12),
+        color: cfg.color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cfg.color.withOpacity(0.5)),
+        border: Border.all(color: cfg.color.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

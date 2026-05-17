@@ -242,13 +242,13 @@ class ProfileScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            AppColors.orange.withOpacity(0.12),
-                            AppColors.yellow.withOpacity(0.08),
+                            AppColors.orange.withValues(alpha: 0.12),
+                            // AppColors.yellow.withValues(0.08),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: AppColors.orange.withOpacity(0.3),
+                          color: AppColors.orange.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -369,9 +369,9 @@ class _VerificationBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

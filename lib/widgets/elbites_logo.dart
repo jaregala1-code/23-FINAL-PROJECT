@@ -20,7 +20,7 @@ class ElbitesLogo extends StatelessWidget {
             borderRadius: BorderRadius.circular(size * 0.28),
             boxShadow: [
               BoxShadow(
-                color: AppColors.green.withOpacity(0.35),
+                color: AppColors.green.withValues(alpha: 0.35),
                 blurRadius: 20,
                 spreadRadius: 0,
                 offset: const Offset(0, 6),

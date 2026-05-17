@@ -23,7 +23,7 @@ class PantryScreen extends StatefulWidget {
 
 class _PantryScreenState extends State<PantryScreen>
     with SingleTickerProviderStateMixin {
-  int _topIndex = 0;
+  final int _topIndex = 0;
   // Track items already swiped so reloads don't re-show them
   final Set<String> _dismissed = {};
 
@@ -421,10 +421,10 @@ class _CircleBtn extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: AppColors.cardBg,
-          border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),

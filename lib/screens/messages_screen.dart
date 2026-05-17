@@ -131,7 +131,7 @@ class MessagesScreen extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
               itemCount: _dummyClaims.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, i) => _ClaimCard(claim: _dummyClaims[i]),
             ),
     );
@@ -155,7 +155,7 @@ class _ClaimCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: claim.status == ClaimStatus.readyForPickup
-              ? AppColors.green.withOpacity(0.4)
+              ? AppColors.green.withValues(alpha: 0.4)
               : AppColors.border,
         ),
       ),
@@ -208,7 +208,7 @@ class _ClaimCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: status.color.withOpacity(0.15),
+                  color: status.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(50),
                 ),
                 child: Text(

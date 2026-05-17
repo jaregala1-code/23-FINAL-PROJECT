@@ -293,7 +293,7 @@ class _FoodCard extends StatelessWidget {
                         vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: post.tagColor.withOpacity(0.15),
+                        color: post.tagColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
