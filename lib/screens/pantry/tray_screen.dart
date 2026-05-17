@@ -14,8 +14,10 @@ class TrayScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<UserAuthProvider>();
-    final myUid = authProvider.appUser?.uid ??
-        context.watch<UserProvider>().user?.uid ?? '';
+    final myUid =
+        authProvider.appUser?.uid ??
+        context.watch<UserProvider>().user?.uid ??
+        '';
 
     return Scaffold(
       backgroundColor: AppColors.darkBg,
@@ -37,30 +39,30 @@ class TrayScreen extends StatelessWidget {
                 final claims = snapshot.data ?? [];
                 if (claims.isEmpty) return const _EmptyTray();
 
-                final approved =
-                    claims.where((c) => c['status'] == 'approved').toList();
-                final pending =
-                    claims.where((c) => c['status'] == 'pending').toList();
+                final approved = claims
+                    .where((c) => c['status'] == 'approved')
+                    .toList();
+                final pending = claims
+                    .where((c) => c['status'] == 'pending')
+                    .toList();
 
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
                   children: [
                     if (approved.isNotEmpty) ...[
                       _SectionLabel(
-                          '🎉 Approved — Ready for Pickup (${approved.length})'),
-                      ...approved.map((c) => _ClaimCard(
-                            claim: c,
-                            myUid: myUid,
-                          )),
+                        '🎉 Approved — Ready for Pickup (${approved.length})',
+                      ),
+                      ...approved.map(
+                        (c) => _ClaimCard(claim: c, myUid: myUid),
+                      ),
                       const SizedBox(height: 16),
                     ],
                     if (pending.isNotEmpty) ...[
                       _SectionLabel(
-                          'Pending Giver Response (${pending.length})'),
-                      ...pending.map((c) => _ClaimCard(
-                            claim: c,
-                            myUid: myUid,
-                          )),
+                        'Pending Giver Response (${pending.length})',
+                      ),
+                      ...pending.map((c) => _ClaimCard(claim: c, myUid: myUid)),
                     ],
                   ],
                 );
@@ -113,7 +115,7 @@ class _ClaimCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isApproved
-              ? AppColors.green.withValues(0.4)
+              ? AppColors.green.withOpacity(0.4)
               : AppColors.border,
         ),
       ),
@@ -193,8 +195,11 @@ class _ClaimCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  const Icon(Icons.hourglass_top_rounded,
-                      size: 14, color: AppColors.mutedText),
+                  const Icon(
+                    Icons.hourglass_top_rounded,
+                    size: 14,
+                    color: AppColors.mutedText,
+                  ),
                   const SizedBox(width: 6),
                   const Expanded(
                     child: Text(
@@ -212,8 +217,7 @@ class _ClaimCard extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text('Remove',
-                        style: TextStyle(fontSize: 12)),
+                    child: const Text('Remove', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
@@ -224,14 +228,15 @@ class _ClaimCard extends StatelessWidget {
     );
   }
 
-  void _confirmRemove(
-      BuildContext context, String itemId, String docId) async {
+  void _confirmRemove(BuildContext context, String itemId, String docId) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.cardBg,
-        title: const Text('Remove from Tray?',
-            style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w600)),
+        title: const Text(
+          'Remove from Tray?',
+          style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w600),
+        ),
         content: const Text(
           'Your claim request will be cancelled.',
           style: TextStyle(color: AppColors.mutedText),
@@ -239,13 +244,17 @@ class _ClaimCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Keep',
-                style: TextStyle(color: AppColors.mutedText)),
+            child: const Text(
+              'Keep',
+              style: TextStyle(color: AppColors.mutedText),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove',
-                style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Remove',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -273,9 +282,9 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        border: Border.all(color: color.withOpacity(0.4)),
       ),
       child: Text(
         label,

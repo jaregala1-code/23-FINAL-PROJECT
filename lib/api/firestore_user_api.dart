@@ -1,6 +1,7 @@
 // lib/api/firestore_user_api.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/app_user.dart';
 
 class FirestoreUserAPI {
@@ -8,7 +9,14 @@ class FirestoreUserAPI {
   static const String _collection = 'users';
 
   Future<void> createUser(AppUser user) async {
-    await _db.collection(_collection).doc(user.uid).set(user.toFirestore());
+    // Fire-and-forget the server commit
+    _db
+        .collection(_collection)
+        .doc(user.uid)
+        .set(user.toFirestore())
+        .catchError((e) {
+          debugPrint('[FirestoreUserAPI] createUser write error: $e');
+        });
   }
 
   Future<AppUser?> getUser(String uid) async {
