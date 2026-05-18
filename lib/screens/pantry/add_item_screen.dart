@@ -24,15 +24,19 @@ class AddItemScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<UserAuthProvider>();
     final userProvider = context.watch<UserProvider>();
-    final myUid =
-        authProvider.appUser?.uid ?? userProvider.user?.uid ?? '';
+    final myUid = authProvider.appUser?.uid ?? userProvider.user?.uid ?? '';
     final pantry = context.watch<PantryProvider>();
 
-    final myItems =
-        pantry.items.where((i) => i.ownerUid == myUid).toList();
-    final active = myItems.where((i) => i.status == ItemStatus.available).toList();
-    final reserved = myItems.where((i) => i.status == ItemStatus.reserved).toList();
-    final completed = myItems.where((i) => i.status == ItemStatus.completed).toList();
+    final myItems = pantry.items.where((i) => i.ownerUid == myUid).toList();
+    final active = myItems
+        .where((i) => i.status == ItemStatus.available)
+        .toList();
+    final reserved = myItems
+        .where((i) => i.status == ItemStatus.reserved)
+        .toList();
+    final completed = myItems
+        .where((i) => i.status == ItemStatus.completed)
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.darkBg,
@@ -156,14 +160,12 @@ class _ListingCard extends StatelessWidget {
         if (isActive && item.id != null) {
           Navigator.push(
             context,
-            MaterialPageRoute(
-                builder: (_) => RequestersPage(item: item)),
+            MaterialPageRoute(builder: (_) => RequestersPage(item: item)),
           );
         } else if (isReserved) {
           Navigator.push(
             context,
-            MaterialPageRoute(
-                builder: (_) => QRScannerScreen(item: item)),
+            MaterialPageRoute(builder: (_) => QRScannerScreen(item: item)),
           );
         }
       },
@@ -193,8 +195,7 @@ class _ListingCard extends StatelessWidget {
                         height: 72,
                         color: AppColors.cardBg2,
                         child: const Center(
-                          child: Text('🍽️',
-                              style: TextStyle(fontSize: 28)),
+                          child: Text('🍽️', style: TextStyle(fontSize: 28)),
                         ),
                       ),
               ),
@@ -222,13 +223,17 @@ class _ListingCard extends StatelessWidget {
                     Text(
                       item.quantity,
                       style: const TextStyle(
-                          color: AppColors.mutedText, fontSize: 12),
+                        color: AppColors.mutedText,
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Expires ${DateFormat('MMM d').format(item.expirationDate)}',
                       style: const TextStyle(
-                          color: AppColors.mutedText, fontSize: 12),
+                        color: AppColors.mutedText,
+                        fontSize: 12,
+                      ),
                     ),
                     if (isActive) ...[
                       const SizedBox(height: 4),

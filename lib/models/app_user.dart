@@ -5,9 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // ─── Verification lifecycle ───────────────────────────────────────────────────
 enum VerificationStatus { unverified, pending, verified, rejected }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // DietaryTag — used by both the signup flow and location preference widget
-// ─────────────────────────────────────────────────────────────────────────────
 
 class DietaryTag {
   const DietaryTag({
@@ -67,6 +65,10 @@ class AppUser {
     this.location,
     this.locationAddress,
     this.radiusKm = 2.0,
+    // Notification preferences
+    this.notifyNewItems = true,
+    this.notifyPickupReminders = true,
+    this.notifyChatMessages = true,
   });
 
   final String uid;
@@ -79,6 +81,11 @@ class AppUser {
   final List<String> foodTagIds;
   // Alias getter so milestone widgets that reference dietaryTags still work
   List<String> get dietaryTags => foodTagIds;
+
+  // Notification preferences
+  final bool notifyNewItems;
+  final bool notifyPickupReminders;
+  final bool notifyChatMessages;
 
   // Verification
   final VerificationStatus verificationStatus;
@@ -116,6 +123,9 @@ class AppUser {
     'location': location,
     'locationAddress': locationAddress,
     'radiusKm': radiusKm,
+    'notifyNewItems': notifyNewItems,
+    'notifyPickupReminders': notifyPickupReminders,
+    'notifyChatMessages': notifyChatMessages,
   };
 
   // Alias so old ELBites code calling toMap() still works
@@ -158,6 +168,9 @@ class AppUser {
           (d['radiusKm'] as num?)?.toDouble() ??
           (d['discoveryRadius'] as num?)?.toDouble() ??
           2.0,
+      notifyNewItems: d['notifyNewItems'] as bool? ?? true,
+      notifyPickupReminders: d['notifyPickupReminders'] as bool? ?? true,
+      notifyChatMessages: d['notifyChatMessages'] as bool? ?? true,
     );
   }
 
@@ -175,6 +188,9 @@ class AppUser {
     GeoPoint? location,
     String? locationAddress,
     double? radiusKm,
+    bool? notifyNewItems,
+    bool? notifyPickupReminders,
+    bool? notifyChatMessages,
   }) => AppUser(
     uid: uid,
     email: email ?? this.email,
@@ -192,5 +208,8 @@ class AppUser {
     location: location ?? this.location,
     locationAddress: locationAddress ?? this.locationAddress,
     radiusKm: radiusKm ?? this.radiusKm,
+    notifyNewItems: notifyNewItems ?? this.notifyNewItems,
+    notifyPickupReminders: notifyPickupReminders ?? this.notifyPickupReminders,
+    notifyChatMessages: notifyChatMessages ?? this.notifyChatMessages,
   );
 }

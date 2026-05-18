@@ -16,6 +16,12 @@ dependencies:
   firebase_core: ^4.7.0
   firebase_auth: ^6.4.0
   cloud_firestore: ^6.3.0
+  firebase_messaging: ^16.0.2
+
+  # Local notifications + timezone 
+  flutter_local_notifications: ^19.5.4
+  timezone: ^0.10.4
+  flutter_timezone: ^4.1.2
 
   # State management
   provider: ^6.1.5+1

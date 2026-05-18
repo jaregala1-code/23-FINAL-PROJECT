@@ -25,8 +25,10 @@ class QRDisplayScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.black,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.white),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.white,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -43,7 +45,7 @@ class QRDisplayScreen extends StatelessWidget {
               Text(
                 'Show this to your Giver',
                 style: TextStyle(
-                  color: AppColors.white.withValues(alpha: 0.7),
+                  color: AppColors.white.withOpacity(0.7),
                   fontSize: 16,
                 ),
                 textAlign: TextAlign.center,
@@ -78,11 +80,9 @@ class QRDisplayScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.08),
+                  color: AppColors.white.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: AppColors.white.withValues(alpha: 0.15),
-                  ),
+                  border: Border.all(color: AppColors.white.withOpacity(0.15)),
                 ),
                 child: Column(
                   children: [
@@ -99,7 +99,7 @@ class QRDisplayScreen extends StatelessWidget {
                     Text(
                       'Pickup from $ownerName',
                       style: TextStyle(
-                        color: AppColors.white.withValues(alpha: 0.6),
+                        color: AppColors.white.withOpacity(0.6),
                         fontSize: 13,
                       ),
                     ),
@@ -111,13 +111,16 @@ class QRDisplayScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.shield_outlined,
-                      size: 14, color: AppColors.yellow),
+                  const Icon(
+                    Icons.shield_outlined,
+                    size: 14,
+                    color: AppColors.yellow,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Unique code — only show at the pickup location',
                     style: TextStyle(
-                      color: AppColors.white.withValues(alpha: 0.5),
+                      color: AppColors.white.withOpacity(0.5),
                       fontSize: 12,
                     ),
                   ),
