@@ -15,9 +15,7 @@ class PantryProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<List<SurplusItem>>? _sub;
 
-  // Local-notification fallback context — provided by the screen that owns
-  // the user provider so we can match items against the current user's
-  // dietary tags and area when the Cloud Function isn't deployed.
+  // Local-notification fallback context
   AppUser? _currentUser;
   Set<String> _seenItemIds = {};
   bool _firstEmissionConsumed = false;

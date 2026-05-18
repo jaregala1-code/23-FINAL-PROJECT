@@ -26,16 +26,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final _msgCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
 
-  // Cache the Firestore stream so rebuilds don't re-subscribe and flash
-  // the loading state every time a provider notifies.
-  Stream<List<ChatMessage>>? _messagesStream;
-
-  Stream<List<ChatMessage>> _ensureMessagesStream() {
-    return _messagesStream ??= context.read<ChatProvider>().getMessagesStream(
-      widget.chat.id,
-    );
-  }
-
   @override
   void dispose() {
     _msgCtrl.dispose();
@@ -113,9 +103,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final otherName = widget.chat.getOtherName(widget.myUid);
     final receiverUid = widget.chat.getOtherUid(widget.myUid);
 
-    // The receiver is whichever participant isn't the giver. Both givers and
-    // receivers can set the time from this screen — we look it up against
-    // the item to figure out who claims it.
     final ok = await ClaimService.instance.setAgreedPickupTime(
       itemId: itemId,
       itemTitle: itemTitle,
@@ -130,7 +117,6 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // Drop a system message into the chat so both parties see the agreed time.
     await chatProvider.sendMessage(
       chatId: widget.chat.id,
       senderId: widget.myUid,
@@ -165,6 +151,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chatProvider = context.watch<ChatProvider>();
     final otherName = widget.chat.getOtherName(widget.myUid);
 
     return Scaffold(
@@ -216,7 +203,13 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
-          if (widget.chat.relatedItemId != null)
+          // Only the giver (owner of the item) can set the pickup time,
+          // because the write touches the item doc and Firestore security
+          // rules restrict that to the owner. participants[0] is the giver
+          // per ClaimService.approveRequester's write order.
+          if (widget.chat.relatedItemId != null &&
+              widget.chat.participants.isNotEmpty &&
+              widget.chat.participants[0] == widget.myUid)
             IconButton(
               icon: const Icon(
                 Icons.schedule_rounded,
@@ -233,7 +226,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Messages list
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
-              stream: _ensureMessagesStream(),
+              stream: chatProvider.getMessagesStream(widget.chat.id),
               builder: (context, snapshot) {
                 final messages = snapshot.data ?? [];
 
@@ -242,7 +235,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Padding(
                       padding: EdgeInsets.all(32),
                       child: Text(
-                        'Say hi! Agree on a pickup time and place. ',
+                        'Say hi! Agree on a pickup time and place. 👋',
                         style: TextStyle(
                           color: AppColors.mutedText,
                           fontSize: 14,

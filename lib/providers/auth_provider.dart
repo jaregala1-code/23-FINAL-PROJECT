@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../api/firebase_auth_api.dart';
 import '../api/firestore_user_api.dart';
 import '../models/app_user.dart';
-import '../services/notification_service.dart';
 
 class UserAuthProvider with ChangeNotifier {
   late FirebaseAuthAPI _authService;
@@ -14,7 +13,7 @@ class UserAuthProvider with ChangeNotifier {
   bool _isLoading = false;
 
   // Optional callback  set by whoever needs to react after login
-
+  // e.g. to load LocationProvider. Avoids circular provider dependencies.
   void Function(String uid)? onUserLoaded;
 
   UserAuthProvider() {
@@ -115,10 +114,6 @@ class UserAuthProvider with ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    final uid = _authService.currentUser?.uid;
-    if (uid != null) {
-      await NotificationService.instance.unregisterFcmToken(uid);
-    }
     await _authService.signOut();
     _appUser = null;
     notifyListeners();
