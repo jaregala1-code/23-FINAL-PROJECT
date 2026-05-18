@@ -54,11 +54,15 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 tooltip: 'Sign out',
                 onPressed: () async {
-                  // Stop the pantry stream FIRST so it doesn't fire
-                  // PERMISSION_DENIED errors against the new no-auth state.
+                  final navigator = Navigator.of(context);
+                  // Tear down Firestore streams BEFORE signing out so they
+                  // don't fire PERMISSION_DENIED noise.
                   context.read<PantryProvider>().stopListening();
                   context.read<UserProvider>().clear();
                   await context.read<UserAuthProvider>().signOut();
+                  // Explicitly pop everything back to HomeScreen, which will
+                  // re-render as SplashScreen once auth is null.
+                  navigator.popUntil((route) => route.isFirst);
                 },
               ),
             ],
