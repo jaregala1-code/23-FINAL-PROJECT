@@ -16,9 +16,7 @@ class PantryProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<List<SurplusItem>>? _sub;
 
-  // Local-notification fallback context — provided by the screen that owns
-  // the user provider so we can match items against the current user's
-  // dietary tags and area when the Cloud Function isn't deployed.
+  // Local-notification fallback context
   AppUser? _currentUser;
   Set<String> _seenItemIds = {};
   bool _firstEmissionConsumed = false;
@@ -42,10 +40,7 @@ class PantryProvider extends ChangeNotifier {
     notifyListeners();
     _sub = _svc.streamAvailableItems().listen(
       (list) {
-        // Local fallback: fire a notification for items that appeared since
-        // the last emission. The first emission is the "initial snapshot"
-        // (items that existed before the user opened the app) — we treat
-        // those as already seen so we don't fire on every cold start.
+        // Local fallback: fire a notification for items that appeared since the last emission
         if (_firstEmissionConsumed) {
           for (final item in list) {
             if (item.id == null) continue;

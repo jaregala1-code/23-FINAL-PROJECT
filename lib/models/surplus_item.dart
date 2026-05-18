@@ -2,14 +2,9 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ─── Status lifecycle ─────────────────────────────────────────────────────────
-// available → (receiver requests) → reserved → (QR handshake) → completed
-
 enum ItemStatus { available, reserved, completed }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // SurplusItem
-// ─────────────────────────────────────────────────────────────────────────────
 
 class SurplusItem {
   const SurplusItem({
@@ -129,10 +124,7 @@ class SurplusItem {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // ItemRequest
-// Stored in: surplus_items/{itemId}/requests/{requesterUid}
-// ─────────────────────────────────────────────────────────────────────────────
 
 class ItemRequest {
   const ItemRequest({

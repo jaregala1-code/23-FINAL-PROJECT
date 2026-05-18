@@ -5,9 +5,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ─── ClaimRequest ─────────────────────────────────────────────────────────────
-// Stored at: surplus_items/{itemId}/requests/{requesterUid}
-// The existing ItemRequest in surplus_item.dart only has basic fields.
-// This extended version adds the QR token and claim lifecycle for Milestone 3.
 
 class ClaimRequest {
   final String id;
@@ -99,9 +96,6 @@ class ClaimRequest {
 }
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
-// Chat ID = alphabetically sorted UID pair joined by underscore.
-// Stored at: chats/{chatId}
-// Messages at: chats/{chatId}/messages/{msgId}
 
 class Chat {
   final String id;

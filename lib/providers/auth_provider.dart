@@ -14,7 +14,7 @@ class UserAuthProvider with ChangeNotifier {
   bool _isLoading = false;
 
   // Optional callback  set by whoever needs to react after login
-  // e.g. to load LocationProvider. Avoids circular provider dependencies.
+
   void Function(String uid)? onUserLoaded;
 
   UserAuthProvider() {

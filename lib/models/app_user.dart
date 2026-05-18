@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // ─── Verification lifecycle ───────────────────────────────────────────────────
 enum VerificationStatus { unverified, pending, verified, rejected }
 
-// DietaryTag — used by both the signup flow and location preference widget
+// DietaryTag  used by both the signup flow and location preference widget
 
 class DietaryTag {
   const DietaryTag({
@@ -40,9 +40,7 @@ const List<DietaryTag> kFoodTags = [
   DietaryTag(id: 'organic', label: 'Organic', emoji: '♻️'),
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
 // AppUser
-// ─────────────────────────────────────────────────────────────────────────────
 
 class AppUser {
   const AppUser({
@@ -51,7 +49,7 @@ class AppUser {
     this.firstName = '',
     this.lastName = '',
     this.displayName = '',
-    // Tags — stored as string IDs; both 'dietaryTags' and 'foodTagIds' map here
+    // Tags  stored as string IDs; both 'dietaryTags' and 'foodTagIds' map here
     this.foodTagIds = const [],
     // Verification
     this.verificationStatus = VerificationStatus.unverified,

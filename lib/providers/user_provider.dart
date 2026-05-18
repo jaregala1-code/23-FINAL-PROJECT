@@ -1,9 +1,4 @@
 // lib/providers/user_provider.dart
-//
-// Thin wrapper used by milestone widgets (ProfilePhotoWidget,
-// LocationPreferenceWidget, VerificationSelfieScreen, AddItemScreen).
-// Delegates Firestore reads/writes to FirestoreUserAPI so there is
-// a single source of truth for user data.
 
 import 'package:flutter/material.dart';
 import '../api/firestore_user_api.dart';

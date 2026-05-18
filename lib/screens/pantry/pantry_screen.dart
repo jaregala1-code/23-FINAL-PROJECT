@@ -1,7 +1,4 @@
 // lib/screens/pantry/pantry_screen.dart
-//
-// Bumble-style swipe card feed. Uses existing PantryProvider + SurplusItem.
-// Swipe right → claim request. Swipe left → pass. Tap → detail sheet.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
