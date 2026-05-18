@@ -47,8 +47,12 @@ class LocationService {
 
     // 2. Get current GPS position
     final Position pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
+      ),
     );
+
 
     // 3. Reverse geocode — best-effort; fall back to raw coords
     final String address = await _reverseGeocode(pos.latitude, pos.longitude);

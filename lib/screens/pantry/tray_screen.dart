@@ -113,7 +113,7 @@ class _ClaimCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isApproved
-              ? AppColors.green.withValues(0.4)
+              ? AppColors.green.withValues(alpha: 0.4)
               : AppColors.border,
         ),
       ),

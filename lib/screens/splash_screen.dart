@@ -205,7 +205,7 @@ class _MiniCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: AppColors.green.withValues(0.15),
+                color: AppColors.green.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
