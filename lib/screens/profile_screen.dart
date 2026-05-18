@@ -11,6 +11,7 @@ import '../widgets/dietary_tag_chip.dart';
 import '../widgets/pantry/base64_image.dart';
 import 'profile/profile_settings_screen.dart';
 import '../providers/pantry_provider.dart';
+import 'home_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final User firebaseUser;
@@ -57,11 +58,16 @@ class ProfileScreen extends StatelessWidget {
                   final auth = context.read<UserAuthProvider>();
                   final userProv = context.read<UserProvider>();
                   final pantry = context.read<PantryProvider>();
+                  final navigator = Navigator.of(context);
+
                   pantry.stopListening();
                   userProv.clear();
                   await auth.signOut();
-                  if (!context.mounted) return;
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+
+                  navigator.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+                    (route) => false,
+                  );
                 },
               ),
             ],

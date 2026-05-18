@@ -57,7 +57,7 @@ class HomeScreen extends StatelessWidget {
           }
         });
 
-        // Authenticated → show main navigation with bottom nav bar
+        // Authenticated; show main navigation with bottom nav bar
         return MainNavigationScreen(firebaseUser: user);
       },
     );
