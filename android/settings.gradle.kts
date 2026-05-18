@@ -15,17 +15,6 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
-
-    // Force-resolve any com.android.* plugin request to AGP 8.6.0 — bypasses
-    // the Gradle daemon's cached resolution of 8.11.x which collides with
-    // the Flutter Gradle plugin's generateLockfiles task.
-    resolutionStrategy {
-        eachPlugin {
-            if (requested.id.id.startsWith("com.android")) {
-                useModule("com.android.tools.build:gradle:8.6.0")
-            }
-        }
-    }
 }
 
 plugins {
