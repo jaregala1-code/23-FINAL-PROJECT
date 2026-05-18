@@ -115,7 +115,7 @@ class _ClaimCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isApproved
-              ? AppColors.green.withOpacity(0.4)
+              ? AppColors.green.withValues(alpha: 0.4)
               : AppColors.border,
         ),
       ),
@@ -259,15 +259,15 @@ class _ClaimCard extends StatelessWidget {
         ],
       ),
     );
-    if (ok == true) {
-      final authProvider = context.read<UserAuthProvider>();
-      final uid = authProvider.appUser?.uid ?? '';
-      await ClaimService.instance.cancelClaim(
-        itemId: itemId,
-        requesterUid: uid,
-        claimDocId: docId,
-      );
-    }
+    if (ok != true) return;
+    if (!context.mounted) return;
+    final authProvider = context.read<UserAuthProvider>();
+    final uid = authProvider.appUser?.uid ?? '';
+    await ClaimService.instance.cancelClaim(
+      itemId: itemId,
+      requesterUid: uid,
+      claimDocId: docId,
+    );
   }
 }
 
@@ -282,9 +282,9 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         label,

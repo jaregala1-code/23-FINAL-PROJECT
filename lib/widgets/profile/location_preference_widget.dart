@@ -18,15 +18,20 @@ class LocationPreferenceWidget extends StatefulWidget {
 
 class _LocationPreferenceWidgetState extends State<LocationPreferenceWidget> {
   late Set<String> _selectedTagIds;
+  late bool _notifyNewItems;
+  late bool _notifyPickupReminders;
+  late bool _notifyChatMessages;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedTagIds = Set<String>.from(
-      context.read<UserProvider>().user?.foodTagIds ?? [],
-    );
-    final uid = context.read<UserProvider>().user?.uid;
+    final user = context.read<UserProvider>().user;
+    _selectedTagIds = Set<String>.from(user?.foodTagIds ?? []);
+    _notifyNewItems = user?.notifyNewItems ?? true;
+    _notifyPickupReminders = user?.notifyPickupReminders ?? true;
+    _notifyChatMessages = user?.notifyChatMessages ?? true;
+    final uid = user?.uid;
     if (uid != null) {
       context.read<LocationProvider>().loadFromFirestore(uid);
     }
@@ -40,21 +45,26 @@ class _LocationPreferenceWidgetState extends State<LocationPreferenceWidget> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final uid = context.read<UserProvider>().user?.uid;
-    if (uid == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final locationProvider = context.read<LocationProvider>();
+    final userProvider = context.read<UserProvider>();
+    final uid = userProvider.user?.uid;
+    if (uid == null) {
+      setState(() => _saving = false);
+      return;
+    }
 
-    await context.read<LocationProvider>().saveToFirestore(uid);
-    await context.read<UserProvider>().updateUser({
+    await locationProvider.saveToFirestore(uid);
+    await userProvider.updateUser({
       'foodTagIds': _selectedTagIds.toList(),
       'dietaryTags': _selectedTagIds.toList(),
+      'notifyNewItems': _notifyNewItems,
+      'notifyPickupReminders': _notifyPickupReminders,
+      'notifyChatMessages': _notifyChatMessages,
     });
+    if (!mounted) return;
     setState(() => _saving = false);
-
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Preferences saved!')));
-    }
+    messenger.showSnackBar(const SnackBar(content: Text('Preferences saved!')));
   }
 
   @override
@@ -101,6 +111,37 @@ class _LocationPreferenceWidgetState extends State<LocationPreferenceWidget> {
           tags: kFoodTags,
           selectedIds: _selectedTagIds,
           onToggle: _toggleTag,
+        ),
+
+        const SizedBox(height: 24),
+
+        _SectionHeader(
+          icon: Icons.notifications_active_outlined,
+          title: 'Notifications',
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Choose which alerts you want to receive.',
+          style: TextStyle(color: AppColors.mutedText, fontSize: 12),
+        ),
+        const SizedBox(height: 12),
+        _NotificationToggle(
+          label: 'New items matching your tags',
+          subtitle: 'Get pinged when a neighbour posts food you might like.',
+          value: _notifyNewItems,
+          onChanged: (v) => setState(() => _notifyNewItems = v),
+        ),
+        _NotificationToggle(
+          label: 'Pickup reminders',
+          subtitle: 'A nudge 1 hour before an agreed meetup.',
+          value: _notifyPickupReminders,
+          onChanged: (v) => setState(() => _notifyPickupReminders = v),
+        ),
+        _NotificationToggle(
+          label: 'Chat messages',
+          subtitle: 'New messages from givers and receivers.',
+          value: _notifyChatMessages,
+          onChanged: (v) => setState(() => _notifyChatMessages = v),
         ),
 
         const SizedBox(height: 28),
@@ -296,6 +337,52 @@ class _RadiusSlider extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NotificationToggle extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _NotificationToggle({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        value: value,
+        onChanged: onChanged,
+        activeThumbColor: AppColors.yellow,
+        title: Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(color: AppColors.mutedText, fontSize: 11),
+        ),
+      ),
     );
   }
 }

@@ -21,16 +21,20 @@ class _VerificationSelfieScreenState extends State<VerificationSelfieScreen> {
   bool _submitting = false;
 
   Future<void> _submit() async {
-    final uid = context.read<UserProvider>().user?.uid;
+    final userProvider = context.read<UserProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final uid = userProvider.user?.uid;
     if (uid == null) return;
 
     setState(() => _submitting = true);
     final ok = await VerificationService.instance.captureAndSubmit(uid);
-    if (ok) await context.read<UserProvider>().loadUser(uid);
+    if (ok) await userProvider.loadUser(uid);
+    if (!mounted) return;
+
     setState(() => _submitting = false);
 
-    if (ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    if (ok) {
+      messenger.showSnackBar(
         const SnackBar(
           content: Text("Selfie submitted! You'll be notified once verified."),
         ),

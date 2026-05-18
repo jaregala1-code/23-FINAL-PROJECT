@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../api/firebase_auth_api.dart';
 import '../api/firestore_user_api.dart';
 import '../models/app_user.dart';
+import '../services/notification_service.dart';
 
 class UserAuthProvider with ChangeNotifier {
   late FirebaseAuthAPI _authService;
@@ -96,20 +97,16 @@ class UserAuthProvider with ChangeNotifier {
   }
 
   Future<void> signIn(String email, String password) async {
-    final t = Stopwatch()..start();
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     _errorMessage = await _authService.signIn(email, password);
-    debugPrint('⏱  authService.signIn: ${t.elapsedMilliseconds} ms');
-    t.reset();
 
     if (_errorMessage == null) {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
         await loadAppUser(uid);
-        debugPrint('⏱  loadAppUser: ${t.elapsedMilliseconds} ms');
       }
     }
 
@@ -118,11 +115,13 @@ class UserAuthProvider with ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    _appUser = null;
-    _errorMessage = null;
-    _isLoading = false;
-    notifyListeners();
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      await NotificationService.instance.unregisterFcmToken(uid);
+    }
     await _authService.signOut();
+    _appUser = null;
+    notifyListeners();
   }
 
   void clearError() {

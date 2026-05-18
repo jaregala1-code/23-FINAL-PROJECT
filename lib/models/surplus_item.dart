@@ -27,6 +27,8 @@ class SurplusItem {
     this.claimedByName,
     this.meetupTime,
     this.createdAt,
+    this.location,
+    this.locationAddress,
   });
 
   final String? id;
@@ -44,6 +46,9 @@ class SurplusItem {
   final DateTime? meetupTime;
   final DateTime? createdAt;
 
+  final GeoPoint? location;
+  final String? locationAddress;
+
   // ── Firestore serialization ───────────────────────────────────────────────
 
   Map<String, dynamic> toFirestore() => {
@@ -60,6 +65,8 @@ class SurplusItem {
     'claimedByName': claimedByName,
     'meetupTime': meetupTime != null ? Timestamp.fromDate(meetupTime!) : null,
     'createdAt': FieldValue.serverTimestamp(),
+    if (location != null) 'location': location,
+    if (locationAddress != null) 'locationAddress': locationAddress,
   };
 
   factory SurplusItem.fromFirestore(DocumentSnapshot doc) {
@@ -82,6 +89,8 @@ class SurplusItem {
       claimedByName: d['claimedByName'] as String?,
       meetupTime: (d['meetupTime'] as Timestamp?)?.toDate(),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      location: d['location'] as GeoPoint?,
+      locationAddress: d['locationAddress'] as String?,
     );
   }
 
@@ -115,6 +124,8 @@ class SurplusItem {
     claimedByName: claimedByName ?? this.claimedByName,
     meetupTime: meetupTime ?? this.meetupTime,
     createdAt: createdAt ?? this.createdAt,
+    location: location ?? this.location,
+    locationAddress: locationAddress ?? this.locationAddress,
   );
 }
 

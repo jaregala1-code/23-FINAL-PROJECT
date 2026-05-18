@@ -21,17 +21,19 @@ class _ProfilePhotoWidgetState extends State<ProfilePhotoWidget> {
 
   Future<void> _upload(ImageSource source) async {
     setState(() => _uploading = true);
+    final userProvider = context.read<UserProvider>();
     final base64 = await ImageService.instance.pickAndEncode(
       source: source,
       quality: 80,
       maxWidth: 800,
     );
     if (base64 != null) {
-      await context.read<UserProvider>().updateUser({
+      await userProvider.updateUser({
         'profileImageBase64': base64,
         'profileImageUpdatedAt': DateTime.now().toIso8601String(),
       });
     }
+    if (!mounted) return;
     setState(() => _uploading = false);
   }
 

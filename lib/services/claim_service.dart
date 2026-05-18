@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/chat_model.dart';
+import 'notification_service.dart';
 
 class ClaimService {
   ClaimService._();
@@ -112,8 +113,6 @@ class ClaimService {
       });
 
       final batch = _db.batch();
-      // Track sub-collection request docs we've already queued in this batch
-      final touchedRequestDocs = <String>{};
 
       // 1. Reserve the item
       batch.update(_db.collection(_col).doc(itemId), {
@@ -124,30 +123,27 @@ class ClaimService {
         'qrReqId': reqId,
       });
 
-      // 2. Approve the selected requester in sub-collection.
-      batch.set(
+      // 2. Approve the selected requester in sub-collection
+      batch.update(
         _db
             .collection(_col)
             .doc(itemId)
             .collection('requests')
             .doc(requesterUid),
         {'status': 'accepted'},
-        SetOptions(merge: true),
       );
-      touchedRequestDocs.add(requesterUid);
 
       // 3. Update top-level claimRequest docs — approve selected, reject others
+      // Find pending claims for this item
       final pendingClaims = await _db
           .collection(_claims)
           .where('itemId', isEqualTo: itemId)
-          .where('ownerUid', isEqualTo: ownerUid)
           .where('status', isEqualTo: 'pending')
           .get();
 
       for (final doc in pendingClaims.docs) {
         final data = doc.data();
-        final otherUid = data['requesterUid'] as String?;
-        final isSelected = otherUid == requesterUid;
+        final isSelected = data['requesterUid'] == requesterUid;
         if (isSelected) {
           batch.update(doc.reference, {
             'status': 'approved',
@@ -160,35 +156,59 @@ class ClaimService {
             'status': 'rejected',
             'updatedAt': FieldValue.serverTimestamp(),
           });
-          // Reject in sub-collection too — guarded against null/empty uid
-          // (legacy claim docs) and against double-writing the same doc.
-          if (otherUid != null &&
-              otherUid.isNotEmpty &&
-              !touchedRequestDocs.contains(otherUid)) {
-            batch.set(
-              _db
-                  .collection(_col)
-                  .doc(itemId)
-                  .collection('requests')
-                  .doc(otherUid),
-              {'status': 'rejected'},
-              SetOptions(merge: true),
-            );
-            touchedRequestDocs.add(otherUid);
-          }
+          // Reject in sub-collection too
+          batch.update(
+            _db
+                .collection(_col)
+                .doc(itemId)
+                .collection('requests')
+                .doc(data['requesterUid']),
+            {'status': 'rejected'},
+          );
         }
       }
 
       // 4. Create chat between Giver and approved Receiver
       final chatId = Chat.generateId(ownerUid, requesterUid);
-      batch.set(_db.collection(_chats).doc(chatId), {
-        'participants': [ownerUid, requesterUid],
-        'participantNames': {ownerUid: ownerName, requesterUid: requesterName},
-        'updatedAt': FieldValue.serverTimestamp(),
-        'relatedItemId': itemId,
-        'relatedItemTitle': itemTitle,
-        'isArchived': false,
-      }, SetOptions(merge: true));
+      final chatRef = _db.collection(_chats).doc(chatId);
+      final chatSnap = await chatRef.get();
+      if (!chatSnap.exists) {
+        batch.set(chatRef, {
+          'participants': [ownerUid, requesterUid],
+          'participantNames': {
+            ownerUid: ownerName,
+            requesterUid: requesterName,
+          },
+          'lastMessage': '📲 Shared QR code',
+          'lastSenderId': ownerUid,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'relatedItemId': itemId,
+          'relatedItemTitle': itemTitle,
+          'isArchived': false,
+        });
+      } else {
+        batch.update(chatRef, {
+          'lastMessage': '📲 Shared QR code',
+          'lastSenderId': ownerUid,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // 5. Drop the QR code into the chat as a message so both parties have
+      //    it inline. The receiver can also still open it full-screen from
+      //    the Tray, but having it in the chat keeps it next to any
+      //    pickup-time discussion.
+      final qrMsgRef = chatRef.collection('messages').doc();
+      batch.set(qrMsgRef, {
+        'senderId': ownerUid,
+        'senderName': ownerName,
+        'text': 'Show this QR at pickup for $itemTitle',
+        'timestamp': FieldValue.serverTimestamp(),
+        'isRead': false,
+        'type': 'qr',
+        'qrToken': qrToken,
+        'qrItemTitle': itemTitle,
+      });
 
       await batch.commit();
       return true;
@@ -200,26 +220,45 @@ class ClaimService {
 
   // ── Complete exchange via QR (Giver scans) ────────────────────────────────
 
+  /// [ownerUid] is the signed-in giver who's scanning. We verify the item
+  /// actually belongs to them before flipping status — otherwise anyone with
+  /// a leaked QR token could mark the exchange complete.
   Future<bool> completeExchange({
     required String itemId,
     required String reqId,
     required String claimerId,
-    required String ownerUid,
+    String? ownerUid,
   }) async {
     try {
+      // Ownership guard
+      if (ownerUid != null) {
+        final itemSnap = await _db.collection(_col).doc(itemId).get();
+        final data = itemSnap.data();
+        if (data == null) return false;
+        if (data['ownerUid'] != ownerUid) {
+          debugPrint('[ClaimService] completeExchange: caller is not owner');
+          return false;
+        }
+        final storedToken = data['qrReqId'] as String?;
+        if (storedToken != null && storedToken != reqId) {
+          debugPrint('[ClaimService] completeExchange: reqId mismatch');
+          return false;
+        }
+      }
+
       final batch = _db.batch();
 
       // Mark item completed
       batch.update(_db.collection(_col).doc(itemId), {
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
+        if (ownerUid != null) 'completedByUid': ownerUid,
       });
 
       // Mark approved claim as completed
       final approvedClaims = await _db
           .collection(_claims)
           .where('itemId', isEqualTo: itemId)
-          .where('ownerUid', isEqualTo: ownerUid)
           .where('requesterUid', isEqualTo: claimerId)
           .where('status', isEqualTo: 'approved')
           .get();
@@ -235,6 +274,75 @@ class ClaimService {
       return true;
     } catch (e) {
       debugPrint('[ClaimService] completeExchange error: $e');
+      return false;
+    }
+  }
+
+  // ── Agree on meetup time (schedules local pickup reminder) ───────────────
+
+  /// Stores the agreed pickup time on every claim doc for [itemId] (top-level
+  /// claimRequests + the surplus_items sub-collection mirror) and schedules a
+  /// local notification 1 hour before. The Cloud Function (pickupReminder)
+  /// also queues a server-side push from this same field, so users without
+  /// the app in memory still get reminded.
+  Future<bool> setAgreedPickupTime({
+    required String itemId,
+    required String itemTitle,
+    required String requesterUid,
+    required String otherPartyName,
+    required DateTime meetupTime,
+  }) async {
+    try {
+      final batch = _db.batch();
+      final ts = Timestamp.fromDate(meetupTime);
+
+      // Mirror onto the item doc — used by the Cloud Function trigger
+      batch.update(_db.collection(_col).doc(itemId), {
+        'meetupTime': ts,
+        'pickupReminderScheduledAt': Timestamp.fromDate(
+          meetupTime.subtract(const Duration(hours: 1)),
+        ),
+      });
+
+      // Sub-collection request doc
+      batch.update(
+        _db
+            .collection(_col)
+            .doc(itemId)
+            .collection('requests')
+            .doc(requesterUid),
+        {'agreedPickupTime': ts},
+      );
+
+      // Top-level claim docs for this item+requester
+      final claims = await _db
+          .collection(_claims)
+          .where('itemId', isEqualTo: itemId)
+          .where('requesterUid', isEqualTo: requesterUid)
+          .get();
+      for (final d in claims.docs) {
+        batch.update(d.reference, {
+          'agreedPickupTime': ts,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+
+      // Schedule local reminder regardless of whether the Cloud Function is
+      // deployed. The notification id is tied to itemId+requesterUid so a
+      // reschedule replaces the previous one cleanly.
+      final tag = 'pickup-$itemId-$requesterUid';
+      await NotificationService.instance.cancelPickupReminder(tag);
+      await NotificationService.instance.schedulePickupReminder(
+        tag: tag,
+        meetupTime: meetupTime,
+        itemTitle: itemTitle,
+        otherPartyName: otherPartyName,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[ClaimService] setAgreedPickupTime error: $e');
       return false;
     }
   }

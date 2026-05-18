@@ -168,6 +168,8 @@ class Chat {
 
 // ─── ChatMessage ─────────────────────────────────────────────────────────────
 
+enum ChatMessageType { text, qr, system }
+
 class ChatMessage {
   final String id;
   final String senderId;
@@ -175,6 +177,9 @@ class ChatMessage {
   final String text;
   final DateTime timestamp;
   final bool isRead;
+  final ChatMessageType type;
+  final String? qrToken;
+  final String? qrItemTitle;
 
   const ChatMessage({
     required this.id,
@@ -183,6 +188,9 @@ class ChatMessage {
     required this.text,
     required this.timestamp,
     this.isRead = false,
+    this.type = ChatMessageType.text,
+    this.qrToken,
+    this.qrItemTitle,
   });
 
   factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
@@ -194,7 +202,21 @@ class ChatMessage {
       text: d['text'] as String? ?? '',
       timestamp: (d['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: d['isRead'] as bool? ?? false,
+      type: _parseType(d['type'] as String?),
+      qrToken: d['qrToken'] as String?,
+      qrItemTitle: d['qrItemTitle'] as String?,
     );
+  }
+
+  static ChatMessageType _parseType(String? raw) {
+    switch (raw) {
+      case 'qr':
+        return ChatMessageType.qr;
+      case 'system':
+        return ChatMessageType.system;
+      default:
+        return ChatMessageType.text;
+    }
   }
 
   Map<String, dynamic> toFirestore() => {
@@ -203,5 +225,8 @@ class ChatMessage {
     'text': text,
     'timestamp': Timestamp.fromDate(timestamp),
     'isRead': isRead,
+    'type': type.name,
+    if (qrToken != null) 'qrToken': qrToken,
+    if (qrItemTitle != null) 'qrItemTitle': qrItemTitle,
   };
 }

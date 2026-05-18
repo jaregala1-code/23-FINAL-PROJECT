@@ -3,11 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../models/chat_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../services/claim_service.dart';
 import '../../theme/app_theme.dart';
+import '../qr/qr_display_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
@@ -70,6 +73,96 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _pickMeetupTime() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(hours: 2)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 14)),
+      builder: (ctx, child) => _datepickerTheme(ctx, child),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 2))),
+      builder: (ctx, child) => _datepickerTheme(ctx, child),
+    );
+    if (time == null || !mounted) return;
+    final meetupTime = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+
+    final itemId = widget.chat.relatedItemId;
+    final itemTitle = widget.chat.relatedItemTitle ?? 'item';
+    if (itemId == null) {
+      _snack('No item is linked to this chat.');
+      return;
+    }
+
+    final authProvider = context.read<UserAuthProvider>();
+    final userProvider = context.read<UserProvider>();
+    final chatProvider = context.read<ChatProvider>();
+    final me = authProvider.appUser ?? userProvider.user;
+    if (me == null) return;
+    final myName = me.displayName.isNotEmpty ? me.displayName : me.email;
+    final otherName = widget.chat.getOtherName(widget.myUid);
+    final receiverUid = widget.chat.getOtherUid(widget.myUid);
+
+    // The receiver is whichever participant isn't the giver. Both givers and
+    // receivers can set the time from this screen — we look it up against
+    // the item to figure out who claims it.
+    final ok = await ClaimService.instance.setAgreedPickupTime(
+      itemId: itemId,
+      itemTitle: itemTitle,
+      requesterUid: receiverUid,
+      otherPartyName: otherName,
+      meetupTime: meetupTime,
+    );
+
+    if (!mounted) return;
+    if (!ok) {
+      _snack('Could not save the pickup time. Try again.');
+      return;
+    }
+
+    // Drop a system message into the chat so both parties see the agreed time.
+    await chatProvider.sendMessage(
+      chatId: widget.chat.id,
+      senderId: widget.myUid,
+      senderName: myName,
+      text:
+          'Pickup set for ${DateFormat('EEE MMM d, h:mm a').format(meetupTime)}',
+      type: ChatMessageType.system,
+    );
+  }
+
+  Widget _datepickerTheme(BuildContext ctx, Widget? child) {
+    return Theme(
+      data: ThemeData.dark().copyWith(
+        colorScheme: const ColorScheme.dark(
+          primary: AppColors.yellow,
+          onPrimary: AppColors.black,
+          surface: AppColors.cardBg,
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(foregroundColor: AppColors.yellow),
+        ),
+      ),
+      child: child!,
+    );
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final otherName = widget.chat.getOtherName(widget.myUid);
@@ -122,6 +215,18 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        actions: [
+          if (widget.chat.relatedItemId != null)
+            IconButton(
+              icon: const Icon(
+                Icons.schedule_rounded,
+                color: AppColors.yellow,
+                size: 22,
+              ),
+              tooltip: 'Set pickup time',
+              onPressed: _pickMeetupTime,
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -134,13 +239,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 if (messages.isEmpty) {
                   return const Center(
-                    child: Text(
-                      'Say hi! Agree on a pickup time and place. 👋',
-                      style: TextStyle(
-                        color: AppColors.mutedText,
-                        fontSize: 14,
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Text(
+                        'Say hi! Agree on a pickup time and place. ',
+                        style: TextStyle(
+                          color: AppColors.mutedText,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   );
                 }
@@ -158,7 +266,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, i) {
                     final msg = messages[i];
                     final isMe = msg.senderId == widget.myUid;
-                    return _MessageBubble(msg: msg, isMe: isMe);
+                    switch (msg.type) {
+                      case ChatMessageType.qr:
+                        return _QrBubble(msg: msg, isMe: isMe);
+                      case ChatMessageType.system:
+                        return _SystemBubble(msg: msg);
+                      case ChatMessageType.text:
+                        return _MessageBubble(msg: msg, isMe: isMe);
+                    }
                   },
                 );
               },
@@ -246,6 +361,141 @@ class _MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QrBubble extends StatelessWidget {
+  final ChatMessage msg;
+  final bool isMe;
+  const _QrBubble({required this.msg, required this.isMe});
+
+  @override
+  Widget build(BuildContext context) {
+    final token = msg.qrToken;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: GestureDetector(
+          onTap: token == null
+              ? null
+              : () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => QRDisplayScreen(
+                      qrToken: token,
+                      itemTitle: msg.qrItemTitle ?? 'Pickup',
+                      ownerName: msg.senderName,
+                    ),
+                  ),
+                ),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 240),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 16,
+                      color: AppColors.black,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        msg.qrItemTitle ?? 'Pickup QR',
+                        style: const TextStyle(
+                          color: AppColors.black,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (token != null)
+                  QrImageView(
+                    data: token,
+                    version: QrVersions.auto,
+                    size: 180,
+                    backgroundColor: AppColors.white,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: AppColors.black,
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: AppColors.black,
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'QR not available',
+                      style: TextStyle(color: AppColors.black, fontSize: 12),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                Text(
+                  'Tap to enlarge',
+                  style: TextStyle(
+                    color: AppColors.black.withValues(alpha: 0.5),
+                    fontSize: 10,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  DateFormat.jm().format(msg.timestamp),
+                  style: const TextStyle(color: Colors.black54, fontSize: 9),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemBubble extends StatelessWidget {
+  final ChatMessage msg;
+  const _SystemBubble({required this.msg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.yellow.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.yellow.withValues(alpha: 0.35)),
+          ),
+          child: Text(
+            msg.text,
+            style: const TextStyle(
+              color: AppColors.yellow,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
       ),
     );
   }

@@ -6,10 +6,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/surplus_item.dart';
 import '../../providers/pantry_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/location_provider.dart';
 import '../../services/pantry_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/pantry/base64_image.dart';
@@ -131,6 +133,13 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
       return;
     }
 
+    // Snap the giver's saved location onto the listing so the Cloud
+    // Function can filter "interested users within radius".
+    final loc = context.read<LocationProvider>();
+    final GeoPoint? pickupGeo = (loc.latitude != null && loc.longitude != null)
+        ? GeoPoint(loc.latitude!, loc.longitude!)
+        : me.location;
+
     final item = SurplusItem(
       title: _titleCtrl.text.trim(),
       description: _descCtrl.text.trim(),
@@ -140,6 +149,8 @@ class _CreateListingSheetState extends State<CreateListingSheet> {
       ownerUid: me.uid,
       ownerName: me.displayName.isNotEmpty ? me.displayName : me.email,
       tags: List<String>.from(_selectedTags),
+      location: pickupGeo,
+      locationAddress: loc.hasLocation ? loc.address : me.locationAddress,
     );
 
     // Capture messenger & navigator before async gap so we don't look

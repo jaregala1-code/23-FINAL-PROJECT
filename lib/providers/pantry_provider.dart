@@ -3,7 +3,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../models/app_user.dart';
 import '../models/surplus_item.dart';
+import '../services/notification_service.dart';
 import '../services/pantry_service.dart';
 
 class PantryProvider extends ChangeNotifier {
@@ -14,15 +16,49 @@ class PantryProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<List<SurplusItem>>? _sub;
 
+  // Local-notification fallback context — provided by the screen that owns
+  // the user provider so we can match items against the current user's
+  // dietary tags and area when the Cloud Function isn't deployed.
+  AppUser? _currentUser;
+  Set<String> _seenItemIds = {};
+  bool _firstEmissionConsumed = false;
+
   List<SurplusItem> get items => _items;
   bool get loading => _loading;
   String? get error => _error;
+
+  /// Set the user whose preferences should drive local notifications.
+  /// Pass null on sign-out.
+  void setCurrentUser(AppUser? user) {
+    _currentUser = user;
+    if (user == null) {
+      _seenItemIds = {};
+      _firstEmissionConsumed = false;
+    }
+  }
 
   void startListening() {
     _loading = true;
     notifyListeners();
     _sub = _svc.streamAvailableItems().listen(
       (list) {
+        // Local fallback: fire a notification for items that appeared since
+        // the last emission. The first emission is the "initial snapshot"
+        // (items that existed before the user opened the app) — we treat
+        // those as already seen so we don't fire on every cold start.
+        if (_firstEmissionConsumed) {
+          for (final item in list) {
+            if (item.id == null) continue;
+            if (_seenItemIds.contains(item.id)) continue;
+            NotificationService.instance.maybeNotifyNewItem(
+              item: item,
+              me: _currentUser,
+            );
+          }
+        }
+        _seenItemIds = list.map((i) => i.id).whereType<String>().toSet();
+        _firstEmissionConsumed = true;
+
         _items = list;
         _loading = false;
         _error = null;
@@ -56,25 +92,23 @@ class PantryProvider extends ChangeNotifier {
     required String itemId,
     required String requesterUid,
     required String requesterName,
-  }) =>
-      _svc.requestItem(
-        itemId: itemId,
-        requesterUid: requesterUid,
-        requesterName: requesterName,
-      );
+  }) => _svc.requestItem(
+    itemId: itemId,
+    requesterUid: requesterUid,
+    requesterName: requesterName,
+  );
 
   Future<void> acceptRequest({
     required String itemId,
     required String requesterUid,
     required String requesterName,
     DateTime? meetupTime,
-  }) =>
-      _svc.acceptRequest(
-        itemId: itemId,
-        requesterUid: requesterUid,
-        requesterName: requesterName,
-        meetupTime: meetupTime,
-      );
+  }) => _svc.acceptRequest(
+    itemId: itemId,
+    requesterUid: requesterUid,
+    requesterName: requesterName,
+    meetupTime: meetupTime,
+  );
 
   Future<void> markCompleted(String itemId) => _svc.markCompleted(itemId);
 }
