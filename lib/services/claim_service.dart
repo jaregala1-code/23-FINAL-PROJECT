@@ -55,7 +55,11 @@ class ClaimService {
 
       // Write to surplus_items/{itemId}/requests/{requesterUid}
       batch.set(
-        _db.collection(_col).doc(itemId).collection('requests').doc(requesterUid),
+        _db
+            .collection(_col)
+            .doc(itemId)
+            .collection('requests')
+            .doc(requesterUid),
         {
           'requesterUid': requesterUid,
           'requesterName': requesterName,
@@ -66,22 +70,19 @@ class ClaimService {
       );
 
       // Also write to top-level claimRequests for easy querying by receiver
-      batch.set(
-        _db.collection(_claims).doc(reqId),
-        {
-          'reqId': reqId,
-          'itemId': itemId,
-          'itemTitle': itemTitle,
-          'ownerUid': ownerUid,
-          'ownerName': ownerName,
-          'requesterUid': requesterUid,
-          'requesterName': requesterName,
-          'requesterPhotoBase64': requesterPhotoBase64,
-          'status': 'pending',
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        },
-      );
+      batch.set(_db.collection(_claims).doc(reqId), {
+        'reqId': reqId,
+        'itemId': itemId,
+        'itemTitle': itemTitle,
+        'ownerUid': ownerUid,
+        'ownerName': ownerName,
+        'requesterUid': requesterUid,
+        'requesterName': requesterName,
+        'requesterPhotoBase64': requesterPhotoBase64,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       await batch.commit();
       return true;
@@ -111,6 +112,8 @@ class ClaimService {
       });
 
       final batch = _db.batch();
+      // Track sub-collection request docs we've already queued in this batch
+      final touchedRequestDocs = <String>{};
 
       // 1. Reserve the item
       batch.update(_db.collection(_col).doc(itemId), {
@@ -121,14 +124,19 @@ class ClaimService {
         'qrReqId': reqId,
       });
 
-      // 2. Approve the selected requester in sub-collection
-      batch.update(
-        _db.collection(_col).doc(itemId).collection('requests').doc(requesterUid),
+      // 2. Approve the selected requester in sub-collection.
+      batch.set(
+        _db
+            .collection(_col)
+            .doc(itemId)
+            .collection('requests')
+            .doc(requesterUid),
         {'status': 'accepted'},
+        SetOptions(merge: true),
       );
+      touchedRequestDocs.add(requesterUid);
 
       // 3. Update top-level claimRequest docs — approve selected, reject others
-      // Find pending claims for this item
       final pendingClaims = await _db
           .collection(_claims)
           .where('itemId', isEqualTo: itemId)
@@ -137,7 +145,8 @@ class ClaimService {
 
       for (final doc in pendingClaims.docs) {
         final data = doc.data();
-        final isSelected = data['requesterUid'] == requesterUid;
+        final otherUid = data['requesterUid'] as String?;
+        final isSelected = otherUid == requesterUid;
         if (isSelected) {
           batch.update(doc.reference, {
             'status': 'approved',
@@ -150,34 +159,35 @@ class ClaimService {
             'status': 'rejected',
             'updatedAt': FieldValue.serverTimestamp(),
           });
-          // Reject in sub-collection too
-          batch.update(
-            _db
-                .collection(_col)
-                .doc(itemId)
-                .collection('requests')
-                .doc(data['requesterUid']),
-            {'status': 'rejected'},
-          );
+          // Reject in sub-collection too — guarded against null/empty uid
+          // (legacy claim docs) and against double-writing the same doc.
+          if (otherUid != null &&
+              otherUid.isNotEmpty &&
+              !touchedRequestDocs.contains(otherUid)) {
+            batch.set(
+              _db
+                  .collection(_col)
+                  .doc(itemId)
+                  .collection('requests')
+                  .doc(otherUid),
+              {'status': 'rejected'},
+              SetOptions(merge: true),
+            );
+            touchedRequestDocs.add(otherUid);
+          }
         }
       }
 
       // 4. Create chat between Giver and approved Receiver
       final chatId = Chat.generateId(ownerUid, requesterUid);
-      final chatRef = _db.collection(_chats).doc(chatId);
-      final chatSnap = await chatRef.get();
-      if (!chatSnap.exists) {
-        batch.set(chatRef, {
-          'participants': [ownerUid, requesterUid],
-          'participantNames': {ownerUid: ownerName, requesterUid: requesterName},
-          'lastMessage': null,
-          'lastSenderId': null,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'relatedItemId': itemId,
-          'relatedItemTitle': itemTitle,
-          'isArchived': false,
-        });
-      }
+      batch.set(_db.collection(_chats).doc(chatId), {
+        'participants': [ownerUid, requesterUid],
+        'participantNames': {ownerUid: ownerName, requesterUid: requesterName},
+        'updatedAt': FieldValue.serverTimestamp(),
+        'relatedItemId': itemId,
+        'relatedItemTitle': itemTitle,
+        'isArchived': false,
+      }, SetOptions(merge: true));
 
       await batch.commit();
       return true;
@@ -237,7 +247,11 @@ class ClaimService {
       final batch = _db.batch();
       // Remove from sub-collection
       batch.delete(
-        _db.collection(_col).doc(itemId).collection('requests').doc(requesterUid),
+        _db
+            .collection(_col)
+            .doc(itemId)
+            .collection('requests')
+            .doc(requesterUid),
       );
       // Update top-level claim
       batch.update(_db.collection(_claims).doc(claimDocId), {
