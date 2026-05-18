@@ -1,11 +1,4 @@
 // lib/screens/main_navigation_screen.dart
-//
-// 5-tab bottom nav:
-//   0  Pantry      (swipe feed)
-//   1  Tray        (receiver's pending + approved claims)
-//   2  Post        (add item / my listings)
-//   3  Messages    (chat list)
-//   4  Profile
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -49,7 +42,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   void dispose() {
-    context.read<PantryProvider>().stopListening();
+    // PantryProvider auto-cancels in its own dispose;
     super.dispose();
   }
 

@@ -54,12 +54,14 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 tooltip: 'Sign out',
                 onPressed: () async {
-                  final navigator = Navigator.of(context);
-
-                  context.read<PantryProvider>().stopListening();
-                  context.read<UserProvider>().clear();
-                  await context.read<UserAuthProvider>().signOut();
-                  navigator.popUntil((route) => route.isFirst);
+                  final auth = context.read<UserAuthProvider>();
+                  final userProv = context.read<UserProvider>();
+                  final pantry = context.read<PantryProvider>();
+                  pantry.stopListening();
+                  userProv.clear();
+                  await auth.signOut();
+                  if (!context.mounted) return;
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                 },
               ),
             ],

@@ -6,15 +6,8 @@ import '../theme/app_theme.dart';
 import 'splash_screen.dart';
 import 'main_navigation_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  String? _loadedUid;
 
   @override
   Widget build(BuildContext context) {
@@ -47,20 +40,24 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        final user = snapshot.data;
-        if (user == null) {
-          _loadedUid = null;
+        if (!snapshot.hasData) {
           return const SplashScreen();
         }
 
-        if (_loadedUid != user.uid) {
-          _loadedUid = user.uid;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final provider = context.read<UserAuthProvider>();
-            if (provider.appUser == null) provider.loadAppUser(user.uid);
-          });
-        }
+        final user = snapshot.data!;
 
+        // Load app user data if not already loaded.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final provider = context.read<UserAuthProvider>();
+          final current = FirebaseAuth.instance.currentUser;
+          if (provider.appUser == null &&
+              current != null &&
+              current.uid == user.uid) {
+            provider.loadAppUser(user.uid);
+          }
+        });
+
+        // Authenticated → show main navigation with bottom nav bar
         return MainNavigationScreen(firebaseUser: user);
       },
     );
