@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../models/surplus_item.dart';
 import '../../services/claim_service.dart';
@@ -52,7 +53,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       final reqId = decoded['reqId'] as String?;
 
       if (scannedItemId != widget.item.id) {
-        _setResult(false, 'QR code does not match this item.\nDo not hand it over.');
+        _setResult(
+          false,
+          'QR code does not match this item.\nDo not hand it over.',
+        );
         return;
       }
       if (claimerId == null || reqId == null) {
@@ -60,17 +64,26 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         return;
       }
 
+      final ownerUid = FirebaseAuth.instance.currentUser?.uid;
+      if (ownerUid == null) {
+        _setResult(false, 'You must be signed in to confirm the exchange.');
+        return;
+      }
+
       final ok = await ClaimService.instance.completeExchange(
         itemId: scannedItemId!,
         reqId: reqId,
         claimerId: claimerId,
+        ownerUid: ownerUid,
       );
 
       if (ok) {
         _setResult(true, '✅ Exchange confirmed!\nYou can hand over the item.');
       } else {
         _setResult(
-            false, 'Could not confirm exchange. This code may already be used.');
+          false,
+          'Could not confirm exchange. This code may already be used.',
+        );
       }
     } catch (e) {
       _setResult(false, 'Could not read QR code. Please try again.');
@@ -93,12 +106,16 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.white),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.white,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Scan Receiver QR',
-            style: TextStyle(color: AppColors.white)),
+        title: const Text(
+          'Scan Receiver QR',
+          style: TextStyle(color: AppColors.white),
+        ),
         actions: [
           if (!_done)
             IconButton(
@@ -134,8 +151,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               ),
               child: Text(
                 'Verifying: ${widget.item.title}',
-                style: const TextStyle(
-                    color: AppColors.white, fontSize: 14),
+                style: const TextStyle(color: AppColors.white, fontSize: 14),
               ),
             ),
           ),
@@ -176,7 +192,8 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (_success ? AppColors.green : AppColors.error).withValues(alpha: 0.15),
+                color: (_success ? AppColors.green : AppColors.error)
+                    .withValues(alpha: 0.15),
               ),
               child: Icon(
                 _success
@@ -236,10 +253,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 class _ScanOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _OverlayPainter(),
-      child: Container(),
-    );
+    return CustomPaint(painter: _OverlayPainter(), child: Container());
   }
 }
 
@@ -272,19 +286,37 @@ class _OverlayPainter extends CustomPainter {
     canvas.drawLine(Offset(left, top), Offset(left + l, top), cornerPaint);
     // Top-right
     canvas.drawLine(
-        Offset(left + cutW - l, top), Offset(left + cutW, top), cornerPaint);
+      Offset(left + cutW - l, top),
+      Offset(left + cutW, top),
+      cornerPaint,
+    );
     canvas.drawLine(
-        Offset(left + cutW, top), Offset(left + cutW, top + l), cornerPaint);
+      Offset(left + cutW, top),
+      Offset(left + cutW, top + l),
+      cornerPaint,
+    );
     // Bottom-left
     canvas.drawLine(
-        Offset(left, top + cutH - l), Offset(left, top + cutH), cornerPaint);
+      Offset(left, top + cutH - l),
+      Offset(left, top + cutH),
+      cornerPaint,
+    );
     canvas.drawLine(
-        Offset(left, top + cutH), Offset(left + l, top + cutH), cornerPaint);
+      Offset(left, top + cutH),
+      Offset(left + l, top + cutH),
+      cornerPaint,
+    );
     // Bottom-right
-    canvas.drawLine(Offset(left + cutW, top + cutH - l),
-        Offset(left + cutW, top + cutH), cornerPaint);
-    canvas.drawLine(Offset(left + cutW - l, top + cutH),
-        Offset(left + cutW, top + cutH), cornerPaint);
+    canvas.drawLine(
+      Offset(left + cutW, top + cutH - l),
+      Offset(left + cutW, top + cutH),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      Offset(left + cutW - l, top + cutH),
+      Offset(left + cutW, top + cutH),
+      cornerPaint,
+    );
   }
 
   @override

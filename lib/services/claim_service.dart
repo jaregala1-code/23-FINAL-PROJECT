@@ -140,6 +140,7 @@ class ClaimService {
       final pendingClaims = await _db
           .collection(_claims)
           .where('itemId', isEqualTo: itemId)
+          .where('ownerUid', isEqualTo: ownerUid)
           .where('status', isEqualTo: 'pending')
           .get();
 
@@ -203,6 +204,7 @@ class ClaimService {
     required String itemId,
     required String reqId,
     required String claimerId,
+    required String ownerUid,
   }) async {
     try {
       final batch = _db.batch();
@@ -217,6 +219,7 @@ class ClaimService {
       final approvedClaims = await _db
           .collection(_claims)
           .where('itemId', isEqualTo: itemId)
+          .where('ownerUid', isEqualTo: ownerUid)
           .where('requesterUid', isEqualTo: claimerId)
           .where('status', isEqualTo: 'approved')
           .get();
