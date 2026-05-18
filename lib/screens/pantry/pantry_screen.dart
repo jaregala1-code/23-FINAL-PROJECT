@@ -23,7 +23,7 @@ class PantryScreen extends StatefulWidget {
 
 class _PantryScreenState extends State<PantryScreen>
     with SingleTickerProviderStateMixin {
-  final int _topIndex = 0;
+  // final int _topIndex = 0;
   // Track items already swiped so reloads don't re-show them
   final Set<String> _dismissed = {};
 
