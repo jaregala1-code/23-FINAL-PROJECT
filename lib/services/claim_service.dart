@@ -9,7 +9,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/chat_model.dart';
-import 'notification_service.dart';
 
 class ClaimService {
   ClaimService._();
@@ -278,13 +277,11 @@ class ClaimService {
     }
   }
 
-  // ── Agree on meetup time (schedules local pickup reminder) ───────────────
+  // ── Agree on meetup time ──────────────────────────────────────────────────
 
-  /// Stores the agreed pickup time on every claim doc for [itemId] (top-level
-  /// claimRequests + the surplus_items sub-collection mirror) and schedules a
-  /// local notification 1 hour before. The Cloud Function (pickupReminder)
-  /// also queues a server-side push from this same field, so users without
-  /// the app in memory still get reminded.
+  /// Stores the agreed pickup time on every claim doc for [itemId]. The
+  /// local-notification scheduler that used to live here was removed when
+  /// we dropped flutter_local_notifications.
   Future<bool> setAgreedPickupTime({
     required String itemId,
     required String itemTitle,
@@ -296,7 +293,7 @@ class ClaimService {
       final batch = _db.batch();
       final ts = Timestamp.fromDate(meetupTime);
 
-      // Mirror onto the item doc — used by the Cloud Function trigger
+      // Mirror onto the item doc
       batch.update(_db.collection(_col).doc(itemId), {
         'meetupTime': ts,
         'pickupReminderScheduledAt': Timestamp.fromDate(
@@ -328,18 +325,6 @@ class ClaimService {
       }
 
       await batch.commit();
-
-      // Schedule local reminder regardless of whether the Cloud Function is
-      // deployed. The notification id is tied to itemId+requesterUid so a
-      // reschedule replaces the previous one cleanly.
-      final tag = 'pickup-$itemId-$requesterUid';
-      await NotificationService.instance.cancelPickupReminder(tag);
-      await NotificationService.instance.schedulePickupReminder(
-        tag: tag,
-        meetupTime: meetupTime,
-        itemTitle: itemTitle,
-        otherPartyName: otherPartyName,
-      );
       return true;
     } catch (e) {
       debugPrint('[ClaimService] setAgreedPickupTime error: $e');

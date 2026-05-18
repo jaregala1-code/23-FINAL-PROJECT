@@ -3,10 +3,8 @@ plugins {
     // START: FlutterFire Configuration
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
-    // The Flutter Gradle Plugin must be applied after the Android plugin.
-    // NOTE: The kotlin-android plugin used to live here but AGP 9 makes
-    // Kotlin support built-in. Re-adding it would error with "the
-    // kotlin-android plugin must be removed" on AGP 9.
+    id("kotlin-android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -16,15 +14,13 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        // Required by flutter_local_notifications to use java.time on minSdk < 26.
-        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // AGP 9's built-in Kotlin reads jvmTarget from compileOptions.
-    // The kotlinOptions { jvmTarget = ... } block used to live here, but it
-    // belonged to the kotlin-android plugin we just removed.
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
@@ -35,8 +31,6 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // flutter_local_notifications needs multidex when desugaring kicks in
-        multiDexEnabled = true
     }
 
     buildTypes {
@@ -46,10 +40,6 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-}
-
-dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

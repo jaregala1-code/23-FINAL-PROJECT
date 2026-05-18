@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../models/app_user.dart';
 import '../models/surplus_item.dart';
-import '../services/notification_service.dart';
 import '../services/pantry_service.dart';
 
 class PantryProvider extends ChangeNotifier {
@@ -16,7 +15,9 @@ class PantryProvider extends ChangeNotifier {
   String? _error;
   StreamSubscription<List<SurplusItem>>? _sub;
 
-  // Local-notification fallback context
+  // Local-notification fallback context — provided by the screen that owns
+  // the user provider so we can match items against the current user's
+  // dietary tags and area when the Cloud Function isn't deployed.
   AppUser? _currentUser;
   Set<String> _seenItemIds = {};
   bool _firstEmissionConsumed = false;
@@ -40,17 +41,6 @@ class PantryProvider extends ChangeNotifier {
     notifyListeners();
     _sub = _svc.streamAvailableItems().listen(
       (list) {
-        // Local fallback: fire a notification for items that appeared since the last emission
-        if (_firstEmissionConsumed) {
-          for (final item in list) {
-            if (item.id == null) continue;
-            if (_seenItemIds.contains(item.id)) continue;
-            NotificationService.instance.maybeNotifyNewItem(
-              item: item,
-              me: _currentUser,
-            );
-          }
-        }
         _seenItemIds = list.map((i) => i.id).whereType<String>().toSet();
         _firstEmissionConsumed = true;
 

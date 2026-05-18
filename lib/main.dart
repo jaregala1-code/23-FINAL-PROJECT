@@ -9,14 +9,12 @@ import 'providers/user_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/pantry_provider.dart';
 import 'screens/home_screen.dart';
-import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 import 'providers/chat_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await NotificationService.instance.init();
   runApp(const MyApp());
 }
 
@@ -40,15 +38,12 @@ class MyApp extends StatelessWidget {
         builder: (context) {
           // Wire UserAuthProvider → UserProvider + LocationProvider so that
           // after login the milestone widgets have data without a second tap.
-          // Also register the FCM token so the Cloud Function can target this
-          // user with cross-user "new item" notifications.
           context.read<UserAuthProvider>().onUserLoaded = (uid) async {
             final userProvider = context.read<UserProvider>();
             await userProvider.loadUser(uid);
             if (!context.mounted) return;
             context.read<LocationProvider>().loadFromFirestore(uid);
             context.read<PantryProvider>().setCurrentUser(userProvider.user);
-            NotificationService.instance.registerFcmToken(uid);
           };
           return MaterialApp(
             title: 'ELBites',
