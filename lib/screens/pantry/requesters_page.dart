@@ -27,14 +27,13 @@ class RequestersPage extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Item summary card
           _ItemSummary(item: item),
 
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
             child: Text(
               'Select ONE receiver to approve. All other pending requests will be automatically rejected.',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.mutedText,
                 fontSize: 12,
                 height: 1.5,
@@ -52,9 +51,12 @@ class RequestersPage extends StatelessWidget {
                   );
                 }
 
+                // streamRequesters already filters for pending only,
+                // but keep the guard for null status docs
                 final requesters = (snapshot.data ?? [])
-                    .where((r) =>
-                        r['status'] == 'pending' || r['status'] == null)
+                    .where(
+                      (r) => r['status'] == 'pending' || r['status'] == null,
+                    )
                     .toList();
 
                 if (requesters.isEmpty) {
@@ -95,10 +97,7 @@ class RequestersPage extends StatelessWidget {
                   itemCount: requesters.length,
                   itemBuilder: (context, i) {
                     final req = requesters[i];
-                    return _RequesterCard(
-                      req: req,
-                      item: item,
-                    );
+                    return _RequesterCard(req: req, item: item);
                   },
                 );
               },
@@ -109,6 +108,8 @@ class RequestersPage extends StatelessWidget {
     );
   }
 }
+
+// ── Item summary card ─────────────────────────────────────────────────────────
 
 class _ItemSummary extends StatelessWidget {
   final SurplusItem item;
@@ -173,6 +174,8 @@ class _ItemSummary extends StatelessWidget {
   }
 }
 
+// ── Requester card ────────────────────────────────────────────────────────────
+
 class _RequesterCard extends StatelessWidget {
   final Map<String, dynamic> req;
   final SurplusItem item;
@@ -219,13 +222,23 @@ class _RequesterCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              name,
-              style: const TextStyle(
-                color: AppColors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Pending approval',
+                  style: TextStyle(color: AppColors.mutedText, fontSize: 11),
+                ),
+              ],
             ),
           ),
           ElevatedButton(
@@ -234,10 +247,7 @@ class _RequesterCard extends StatelessWidget {
               minimumSize: const Size(80, 36),
               padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
-            child: const Text(
-              'Approve',
-              style: TextStyle(fontSize: 13),
-            ),
+            child: const Text('Approve', style: TextStyle(fontSize: 13)),
           ),
         ],
       ),
@@ -245,11 +255,26 @@ class _RequesterCard extends StatelessWidget {
   }
 
   Future<void> _confirmApprove(
-      BuildContext context, String requesterUid, String requesterName) async {
+    BuildContext context,
+    String requesterUid,
+    String requesterName,
+  ) async {
     final authProvider = context.read<UserAuthProvider>();
     final userProvider = context.read<UserProvider>();
     final me = authProvider.appUser ?? userProvider.user;
-    if (me == null) return;
+
+    // Show error instead of silently returning when user not loaded
+    if (me == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load your profile. Please try again.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
 
     final ok = await showDialog<bool>(
       context: context,
@@ -258,7 +283,9 @@ class _RequesterCard extends StatelessWidget {
         title: Text(
           'Approve $requesterName?',
           style: const TextStyle(
-              color: AppColors.white, fontWeight: FontWeight.w600),
+            color: AppColors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: const Text(
           'All other pending requesters will be notified that the item is no longer available.',
@@ -267,8 +294,10 @@ class _RequesterCard extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.mutedText)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.mutedText),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -279,7 +308,12 @@ class _RequesterCard extends StatelessWidget {
     );
 
     if (ok == true) {
-      final myName = me.displayName.isNotEmpty ? me.displayName : me.email;
+      final myName = me.displayName.isNotEmpty
+          ? me.displayName
+          : me.email.isNotEmpty
+          ? me.email
+          : 'Giver';
+
       final success = await ClaimService.instance.approveRequester(
         itemId: item.id!,
         itemTitle: item.title,
@@ -292,14 +326,16 @@ class _RequesterCard extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(success
-                ? 'Approved! A QR code has been generated.'
-                : 'Something went wrong. Try again.'),
-            backgroundColor:
-                success ? AppColors.green : AppColors.error,
+            content: Text(
+              success
+                  ? 'Approved! A QR code has been generated.'
+                  : 'Something went wrong. Try again.',
+            ),
+            backgroundColor: success ? AppColors.green : AppColors.error,
             margin: const EdgeInsets.all(16),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+              borderRadius: BorderRadius.circular(12),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
