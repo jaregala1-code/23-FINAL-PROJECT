@@ -1,7 +1,4 @@
 // lib/screens/pantry/pantry_screen.dart
-//
-// Bumble-style swipe card feed. Uses existing PantryProvider + SurplusItem.
-// Swipe right → claim request. Swipe left → pass. Tap → detail sheet.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -23,13 +20,11 @@ class PantryScreen extends StatefulWidget {
 
 class _PantryScreenState extends State<PantryScreen>
     with SingleTickerProviderStateMixin {
-  // final int _topIndex = 0;
   // Track items already swiped so reloads don't re-show them
   final Set<String> _dismissed = {};
 
   // Drag state for swipe overlay
   double _dragX = 0;
-  bool _isDragging = false;
 
   late AnimationController _flyCtrl;
   late Animation<Offset> _flyAnim;
@@ -53,9 +48,6 @@ class _PantryScreenState extends State<PantryScreen>
     _flyCtrl.dispose();
     super.dispose();
   }
-
-  List<SurplusItem> _visible(List<SurplusItem> all) =>
-      all.where((i) => !_dismissed.contains(i.id)).toList();
 
   Future<void> _animateOff(bool toRight) async {
     setState(() => _isAnimating = true);
@@ -98,8 +90,7 @@ class _PantryScreenState extends State<PantryScreen>
       ownerUid: item.ownerUid,
       ownerName: item.ownerName,
       requesterUid: me.uid,
-      requesterName:
-          me.displayName.isNotEmpty ? me.displayName : me.email,
+      requesterName: me.displayName.isNotEmpty ? me.displayName : me.email,
       requesterPhotoBase64: me.profileImageBase64,
     );
 
@@ -111,11 +102,11 @@ class _PantryScreenState extends State<PantryScreen>
                 ? '🛒 Added to your Tray!'
                 : 'Could not send request. Try again.',
           ),
-          backgroundColor:
-              success ? AppColors.green : AppColors.error,
+          backgroundColor: success ? AppColors.green : AppColors.error,
           margin: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
+            borderRadius: BorderRadius.circular(12),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -166,19 +157,21 @@ class _PantryScreenState extends State<PantryScreen>
           }
 
           // Filter out own items and already-dismissed
-          final myUidSafe = myUid;
           final items = pantry.items
-              .where((i) =>
-                  i.ownerUid != myUidSafe &&
-                  i.status == ItemStatus.available &&
-                  !_dismissed.contains(i.id))
+              .where(
+                (i) =>
+                    i.ownerUid != myUid &&
+                    i.status == ItemStatus.available &&
+                    !_dismissed.contains(i.id),
+              )
               .toList();
 
           if (items.isEmpty) {
             return const _EmptyState(
               emoji: '🍽️',
               message: 'No food nearby right now',
-              sub: 'Check back soon — the Elbi community posts new items all the time.',
+              sub:
+                  'Check back soon — the Elbi community posts new items all the time.',
             );
           }
 
@@ -193,11 +186,7 @@ class _PantryScreenState extends State<PantryScreen>
                   bottom: 108,
                   child: Transform.scale(
                     scale: 0.94,
-                    child: SwipeCard(
-                      item: items[1],
-                      dragX: 0,
-                      isBack: true,
-                    ),
+                    child: SwipeCard(item: items[1], dragX: 0, isBack: true),
                   ),
                 ),
 
@@ -212,7 +201,6 @@ class _PantryScreenState extends State<PantryScreen>
                   onHorizontalDragUpdate: (d) {
                     if (_isAnimating) return;
                     setState(() {
-                      _isDragging = true;
                       _dragX += d.delta.dx;
                     });
                   },
@@ -226,7 +214,6 @@ class _PantryScreenState extends State<PantryScreen>
                     } else {
                       setState(() {
                         _dragX = 0;
-                        _isDragging = false;
                       });
                     }
                   },
@@ -235,17 +222,17 @@ class _PantryScreenState extends State<PantryScreen>
                     builder: (_, child) {
                       final offset = _isAnimating
                           ? _flyAnim.value
-                          : Offset(_dragX / MediaQuery.of(context).size.width, 0);
+                          : Offset(
+                              _dragX / MediaQuery.of(context).size.width,
+                              0,
+                            );
                       final angle = offset.dx * 0.3;
                       return Transform.translate(
                         offset: Offset(
                           offset.dx * MediaQuery.of(context).size.width,
                           0,
                         ),
-                        child: Transform.rotate(
-                          angle: angle,
-                          child: child,
-                        ),
+                        child: Transform.rotate(angle: angle, child: child),
                       );
                     },
                     child: SwipeCard(
@@ -288,7 +275,9 @@ class _PantryScreenState extends State<PantryScreen>
               color: AppColors.green,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Center(child: Text('🥡', style: TextStyle(fontSize: 14))),
+            child: const Center(
+              child: Text('🥡', style: TextStyle(fontSize: 14)),
+            ),
           ),
           const SizedBox(width: 10),
           const Text(
