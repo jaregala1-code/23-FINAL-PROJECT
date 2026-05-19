@@ -11,6 +11,7 @@ import 'pantry/tray_screen.dart';
 import 'pantry/add_item_screen.dart';
 import 'chat/chat_list_screen.dart';
 import 'profile_screen.dart';
+import 'notifications_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final User firebaseUser;
@@ -36,6 +37,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<PantryProvider>().startListening();
     });
   }
@@ -46,10 +48,54 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.dispose();
   }
 
+  void _openNotifications() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.darkBg,
+      appBar: AppBar(
+        backgroundColor: AppColors.darkBg,
+        automaticallyImplyLeading: false,
+        title: RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'EL',
+                style: TextStyle(
+                  color: AppColors.green,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  fontFamily: 'Sora',
+                ),
+              ),
+              TextSpan(
+                text: 'Bites',
+                style: TextStyle(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w300,
+                  fontSize: 20,
+                  fontFamily: 'Sora',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: AppColors.white,
+            ),
+            onPressed: _openNotifications,
+          ),
+        ],
+      ),
       body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: _ElBitesNavBar(
         currentIndex: _currentIndex,
