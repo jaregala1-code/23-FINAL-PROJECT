@@ -2,14 +2,14 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/app_notification.dart';
 import '../models/chat_model.dart';
+import '../services/notification_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _chats = 'chats';
   static const String _messages = 'messages';
-
-  // ── Streams ──────────────────────────────────────────────────────────────
 
   Stream<List<Chat>> getChatsStream(String uid) => _db
       .collection(_chats)
@@ -26,8 +26,6 @@ class ChatProvider extends ChangeNotifier {
       .orderBy('timestamp')
       .snapshots()
       .map((s) => s.docs.map(ChatMessage.fromFirestore).toList());
-
-  // ── Create / get chat ─────────────────────────────────────────────────────
 
   Future<String> getOrCreateChat({
     required String myUid,
@@ -55,8 +53,6 @@ class ChatProvider extends ChangeNotifier {
     return chatId;
   }
 
-  // ── Send message ──────────────────────────────────────────────────────────
-
   Future<bool> sendMessage({
     required String chatId,
     required String senderId,
@@ -65,6 +61,7 @@ class ChatProvider extends ChangeNotifier {
     ChatMessageType type = ChatMessageType.text,
     String? qrToken,
     String? qrItemTitle,
+    String? recipientUid,
   }) async {
     try {
       final msgRef = _db
@@ -83,8 +80,6 @@ class ChatProvider extends ChangeNotifier {
         qrItemTitle: qrItemTitle,
       );
       await msgRef.set(msg.toFirestore());
-      // System messages shouldn't claim the "last message" preview — they're
-      // informational. QR + text both update the chat list preview.
       if (type != ChatMessageType.system) {
         await _db.collection(_chats).doc(chatId).update({
           'lastMessage': text,
@@ -96,14 +91,28 @@ class ChatProvider extends ChangeNotifier {
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
+
+      if (recipientUid != null &&
+          recipientUid.isNotEmpty &&
+          type != ChatMessageType.system) {
+        await NotificationService.instance.create(
+          userUid: recipientUid,
+          skipIfRecipientIs: senderId,
+          type: AppNotificationType.message,
+          title: senderName.isNotEmpty ? senderName : 'New message',
+          body: type == ChatMessageType.qr
+              ? '📷 Sent you a pickup QR code'
+              : text,
+          payload: {'chatId': chatId},
+        );
+      }
+
       return true;
     } catch (e) {
       debugPrint('[ChatProvider] sendMessage error: $e');
       return false;
     }
   }
-
-  // ── Archive chat (called on item completion) ──────────────────────────────
 
   Future<void> archiveChat(String chatId) async {
     try {

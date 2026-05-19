@@ -2,14 +2,17 @@
 //
 // Manages the full ClaimRequest lifecycle:
 //   request → giver approves (+ QR token generated) → QR scanned → completed
-// Also opens the chat thread on approval.
+// Also opens the chat thread on approval and fires in-app notifications at
+// every important transition.
 
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import '../models/app_notification.dart';
 import '../models/chat_model.dart';
+import 'notification_service.dart';
 
 class ClaimService {
   ClaimService._();
@@ -22,7 +25,6 @@ class ClaimService {
 
   // ── Streams ───────────────────────────────────────────────────────────────
 
-  /// All pending requests on a specific item (Giver's Requesters Page)
   Stream<List<Map<String, dynamic>>> streamRequesters(String itemId) => _db
       .collection(_col)
       .doc(itemId)
@@ -30,7 +32,6 @@ class ClaimService {
       .snapshots()
       .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
 
-  /// All claim requests for the current receiver (Tray)
   Stream<List<Map<String, dynamic>>> streamMyClaims(String uid) => _db
       .collection(_claims)
       .where('requesterUid', isEqualTo: uid)
@@ -54,7 +55,6 @@ class ClaimService {
       final reqId = const Uuid().v4();
       final batch = _db.batch();
 
-      // Write to surplus_items/{itemId}/requests/{requesterUid}
       batch.set(
         _db
             .collection(_col)
@@ -70,7 +70,6 @@ class ClaimService {
         },
       );
 
-      // Also write to top-level claimRequests for easy querying by receiver
       batch.set(_db.collection(_claims).doc(reqId), {
         'reqId': reqId,
         'itemId': itemId,
@@ -86,6 +85,16 @@ class ClaimService {
       });
 
       await batch.commit();
+
+      await NotificationService.instance.create(
+        userUid: ownerUid,
+        skipIfRecipientIs: requesterUid,
+        type: AppNotificationType.claimRequested,
+        title: 'New request for "$itemTitle"',
+        body: '$requesterName wants to claim this item.',
+        payload: {'itemId': itemId, 'requesterUid': requesterUid},
+      );
+
       return true;
     } catch (e) {
       debugPrint('[ClaimService] requestItem error: $e');
@@ -104,7 +113,6 @@ class ClaimService {
     required String requesterName,
   }) async {
     try {
-      // Generate QR token
       final reqId = const Uuid().v4();
       final qrToken = jsonEncode({
         'reqId': reqId,
@@ -112,9 +120,16 @@ class ClaimService {
         'itemId': itemId,
       });
 
+      final pendingClaimsSnap = await _db
+          .collection(_claims)
+          .where('ownerUid', isEqualTo: ownerUid)
+          .where('itemId', isEqualTo: itemId)
+          .get();
+
+      final rejectionTargets = <_RejectionTarget>[];
+
       final batch = _db.batch();
 
-      // 1. Reserve the item
       batch.update(_db.collection(_col).doc(itemId), {
         'status': 'reserved',
         'claimedByUid': requesterUid,
@@ -123,7 +138,6 @@ class ClaimService {
         'qrReqId': reqId,
       });
 
-      // 2. Approve the selected requester in sub-collection
       batch.update(
         _db
             .collection(_col)
@@ -133,20 +147,7 @@ class ClaimService {
         {'status': 'accepted'},
       );
 
-      // 3. Update top-level claimRequest docs — approve selected, reject others
-      // Find pending claims for this item. We constrain by `ownerUid` so the
-      // Firestore security rules on `claimRequests` accept the collection
-      // query: the per-doc rule requires `ownerUid == auth.uid` and Firestore
-      // refuses queries that aren't statically constrained to match it.
-      // `status` is filtered client-side below to avoid needing an extra
-      // composite index.
-      final pendingClaims = await _db
-          .collection(_claims)
-          .where('ownerUid', isEqualTo: ownerUid)
-          .where('itemId', isEqualTo: itemId)
-          .get();
-
-      for (final doc in pendingClaims.docs) {
+      for (final doc in pendingClaimsSnap.docs) {
         final data = doc.data();
         if (data['status'] != 'pending') continue;
         final isSelected = data['requesterUid'] == requesterUid;
@@ -162,19 +163,23 @@ class ClaimService {
             'status': 'rejected',
             'updatedAt': FieldValue.serverTimestamp(),
           });
-          // Reject in sub-collection too
           batch.update(
             _db
                 .collection(_col)
                 .doc(itemId)
                 .collection('requests')
-                .doc(data['requesterUid']),
+                .doc(data['requesterUid'] as String),
             {'status': 'rejected'},
+          );
+          rejectionTargets.add(
+            _RejectionTarget(
+              uid: data['requesterUid'] as String? ?? '',
+              name: data['requesterName'] as String? ?? 'You',
+            ),
           );
         }
       }
 
-      // 4. Create chat between Giver and approved Receiver
       final chatId = Chat.generateId(ownerUid, requesterUid);
       final chatRef = _db.collection(_chats).doc(chatId);
       final chatSnap = await chatRef.get();
@@ -195,6 +200,28 @@ class ClaimService {
       }
 
       await batch.commit();
+
+      await NotificationService.instance.create(
+        userUid: requesterUid,
+        skipIfRecipientIs: ownerUid,
+        type: AppNotificationType.claimApproved,
+        title: 'Approved: "$itemTitle"',
+        body: 'Open your Tray to show the pickup QR code to $ownerName.',
+        payload: {'itemId': itemId, 'chatId': chatId},
+      );
+
+      for (final target in rejectionTargets) {
+        if (target.uid.isEmpty) continue;
+        await NotificationService.instance.create(
+          userUid: target.uid,
+          skipIfRecipientIs: ownerUid,
+          type: AppNotificationType.claimRejected,
+          title: '"$itemTitle" is no longer available',
+          body: 'The giver picked another requester.',
+          payload: {'itemId': itemId},
+        );
+      }
+
       return true;
     } catch (e) {
       debugPrint('[ClaimService] approveRequester error: $e');
@@ -206,39 +233,63 @@ class ClaimService {
 
   Future<bool> completeExchange({
     required String itemId,
+    required String itemTitle,
     required String reqId,
     required String claimerId,
     required String ownerUid,
   }) async {
     try {
-      final batch = _db.batch();
-
-      // Mark item completed
-      batch.update(_db.collection(_col).doc(itemId), {
-        'status': 'completed',
-        'completedAt': FieldValue.serverTimestamp(),
-      });
-
-      // Mark approved claim as completed. As with approveRequester, we must
-      // constrain by `ownerUid` for the Firestore rule to allow the query;
-      // `requesterUid` + `status` are filtered client-side.
-      final approvedClaims = await _db
+      final approvedClaimsSnap = await _db
           .collection(_claims)
           .where('ownerUid', isEqualTo: ownerUid)
           .where('itemId', isEqualTo: itemId)
           .get();
 
-      for (final doc in approvedClaims.docs) {
+      DocumentReference? targetClaim;
+      for (final doc in approvedClaimsSnap.docs) {
         final data = doc.data();
         if (data['requesterUid'] != claimerId) continue;
         if (data['status'] != 'approved') continue;
-        batch.update(doc.reference, {
-          'status': 'completed',
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+        targetClaim = doc.reference;
+        break;
       }
 
+      if (targetClaim == null) {
+        debugPrint(
+          '[ClaimService] completeExchange: no approved claim found for '
+          'item=$itemId claimer=$claimerId',
+        );
+        return false;
+      }
+
+      final batch = _db.batch();
+
+      batch.update(_db.collection(_col).doc(itemId), {
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.update(targetClaim, {
+        'status': 'completed',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.update(
+        _db.collection(_col).doc(itemId).collection('requests').doc(claimerId),
+        {'status': 'completed'},
+      );
+
       await batch.commit();
+
+      await NotificationService.instance.create(
+        userUid: claimerId,
+        skipIfRecipientIs: ownerUid,
+        type: AppNotificationType.claimCompleted,
+        title: 'Pickup complete 🎉',
+        body: 'Thanks for picking up "$itemTitle".',
+        payload: {'itemId': itemId},
+      );
+
       return true;
     } catch (e) {
       debugPrint('[ClaimService] completeExchange error: $e');
@@ -247,14 +298,6 @@ class ClaimService {
   }
 
   // ── Set agreed pickup time (Giver schedules from chat) ───────────────────
-  //
-  // Updates `agreedPickupTime` on:
-  //   - claimRequests/{docId}  (top-level, the source of truth used by Tray)
-  //   - surplus_items/{itemId}/requests/{requesterUid}  (sub-collection mirror)
-  //
-  // The caller must be the item's giver (Firestore rules enforce this on the
-  // surplus_items doc). We read the giver's uid from FirebaseAuth so the
-  // signature stays simple for chat_screen.dart.
 
   Future<bool> setAgreedPickupTime({
     required String itemId,
@@ -270,9 +313,6 @@ class ClaimService {
         return false;
       }
 
-      // Find the active claim doc by (ownerUid, itemId), then filter to the
-      // specific requester client-side. Filtering by ownerUid is required
-      // for the Firestore rules to accept the collection query.
       final snap = await _db
           .collection(_claims)
           .where('ownerUid', isEqualTo: ownerUid)
@@ -284,8 +324,6 @@ class ClaimService {
         final data = doc.data();
         if (data['requesterUid'] != requesterUid) continue;
         final status = data['status'] as String?;
-        // Allow scheduling on approved (post-accept) and pending (rare —
-        // pickup time agreed before formal QR approval).
         if (status == 'approved' || status == 'pending') {
           targetClaim = doc.reference;
           break;
@@ -308,7 +346,6 @@ class ClaimService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // Sub-collection mirror; keyed by requesterUid so we don't need a query.
       batch.update(
         _db
             .collection(_col)
@@ -318,20 +355,26 @@ class ClaimService {
         {'agreedPickupTime': ts},
       );
 
-      // Touch the chat doc so the chat list reflects the activity. The chat
-      // id is deterministic from the two uids.
       final chatId = Chat.generateId(ownerUid, requesterUid);
       batch.update(_db.collection(_chats).doc(chatId), {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       await batch.commit();
-      // Use the params so analyzer doesn't flag them; they double as a
-      // future hook for sending a structured notification.
-      debugPrint(
-        '[ClaimService] pickup set for "$itemTitle" with $otherPartyName '
-        'at $meetupTime',
+
+      await NotificationService.instance.create(
+        userUid: requesterUid,
+        skipIfRecipientIs: ownerUid,
+        type: AppNotificationType.pickupScheduled,
+        title: 'Pickup scheduled for "$itemTitle"',
+        body: '$otherPartyName set the time. Tap to view the chat.',
+        payload: {
+          'itemId': itemId,
+          'chatId': chatId,
+          'meetupTimeMs': meetupTime.millisecondsSinceEpoch,
+        },
       );
+
       return true;
     } catch (e) {
       debugPrint('[ClaimService] setAgreedPickupTime error: $e');
@@ -347,8 +390,10 @@ class ClaimService {
     required String claimDocId,
   }) async {
     try {
+      final claimSnap = await _db.collection(_claims).doc(claimDocId).get();
+      final claimData = claimSnap.data();
+
       final batch = _db.batch();
-      // Remove from sub-collection
       batch.delete(
         _db
             .collection(_col)
@@ -356,16 +401,38 @@ class ClaimService {
             .collection('requests')
             .doc(requesterUid),
       );
-      // Update top-level claim
       batch.update(_db.collection(_claims).doc(claimDocId), {
         'status': 'cancelled',
         'updatedAt': FieldValue.serverTimestamp(),
       });
       await batch.commit();
+
+      if (claimData != null) {
+        final ownerUid = claimData['ownerUid'] as String? ?? '';
+        final requesterName =
+            claimData['requesterName'] as String? ?? 'A receiver';
+        final itemTitle = claimData['itemTitle'] as String? ?? 'your item';
+        if (ownerUid.isNotEmpty) {
+          await NotificationService.instance.create(
+            userUid: ownerUid,
+            skipIfRecipientIs: requesterUid,
+            type: AppNotificationType.claimCancelled,
+            title: 'Request cancelled',
+            body: '$requesterName withdrew their request for "$itemTitle".',
+            payload: {'itemId': itemId},
+          );
+        }
+      }
       return true;
     } catch (e) {
       debugPrint('[ClaimService] cancelClaim error: $e');
       return false;
     }
   }
+}
+
+class _RejectionTarget {
+  final String uid;
+  final String name;
+  const _RejectionTarget({required this.uid, required this.name});
 }

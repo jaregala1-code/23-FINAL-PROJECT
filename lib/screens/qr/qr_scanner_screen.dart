@@ -1,5 +1,10 @@
 // lib/screens/qr/qr_scanner_screen.dart
+//
+// Giver-side QR scanner. Verifies the QR a Receiver presents at pickup and
+// commits the exchange via [ClaimService.completeExchange].
+//
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -16,87 +21,196 @@ class QRScannerScreen extends StatefulWidget {
   State<QRScannerScreen> createState() => _QRScannerScreenState();
 }
 
-class _QRScannerScreenState extends State<QRScannerScreen> {
+enum _ScanPhase {
+  initializing,
+  scanning,
+  processing,
+  success,
+  failure,
+  permissionDenied,
+  cameraError,
+}
+
+class _QRScannerScreenState extends State<QRScannerScreen>
+    with WidgetsBindingObserver {
   MobileScannerController? _ctrl;
-  bool _processing = false;
-  bool _done = false;
-  bool _success = false;
-  String _resultMsg = '';
+
+  _ScanPhase _phase = _ScanPhase.initializing;
+  String _message = '';
+  bool _processingGuard = false; // sync guard for duplicate detections
 
   @override
   void initState() {
     super.initState();
-    _ctrl = MobileScannerController(
-      detectionSpeed: DetectionSpeed.normal,
-      facing: CameraFacing.back,
-    );
+    WidgetsBinding.instance.addObserver(this);
+    _bootScanner();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (_phase == _ScanPhase.scanning) {
+          ctrl.start().catchError((_) {});
+        }
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        ctrl.stop().catchError((_) {});
+        break;
+    }
   }
 
   @override
   void dispose() {
-    _ctrl?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _disposeController();
     super.dispose();
   }
 
-  Future<void> _onDetect(BarcodeCapture capture) async {
-    if (_processing || _done) return;
-    final raw = capture.barcodes.firstOrNull?.rawValue;
-    if (raw == null) return;
+  Future<void> _disposeController() async {
+    final ctrl = _ctrl;
+    _ctrl = null;
+    if (ctrl == null) return;
+    try {
+      await ctrl.dispose();
+    } catch (_) {
+      // Safe to ignore — happens if the platform side already tore down.
+    }
+  }
 
-    setState(() => _processing = true);
-    await _ctrl?.stop();
+  Future<void> _bootScanner() async {
+    await _disposeController();
+    _processingGuard = false;
+    if (!mounted) return;
+    setState(() {
+      _phase = _ScanPhase.initializing;
+      _message = '';
+    });
+
+    final ctrl = MobileScannerController(
+      detectionSpeed: DetectionSpeed.normal,
+      facing: CameraFacing.back,
+      detectionTimeoutMs: 1000,
+      formats: const [BarcodeFormat.qrCode],
+    );
+    _ctrl = ctrl;
 
     try {
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      await ctrl.start();
+      if (!mounted) return;
+      setState(() => _phase = _ScanPhase.scanning);
+    } on MobileScannerException catch (e) {
+      if (!mounted) return;
+      final code = e.errorCode;
+      if (code == MobileScannerErrorCode.permissionDenied) {
+        setState(() {
+          _phase = _ScanPhase.permissionDenied;
+          _message = 'Camera permission is required to scan QR codes.';
+        });
+      } else {
+        setState(() {
+          _phase = _ScanPhase.cameraError;
+          _message =
+              'The camera is unavailable. ${e.errorDetails?.message ?? ''}'
+                  .trim();
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _phase = _ScanPhase.cameraError;
+        _message = 'The camera could not be started.';
+      });
+    }
+  }
+
+  Future<void> _onDetect(BarcodeCapture capture) async {
+    if (_processingGuard) return;
+    if (_phase != _ScanPhase.scanning) return;
+    final raw = capture.barcodes.firstOrNull?.rawValue;
+    if (raw == null || raw.isEmpty) return;
+
+    _processingGuard = true; // sync flip BEFORE awaits
+    setState(() => _phase = _ScanPhase.processing);
+
+    await _ctrl?.stop().catchError((_) {});
+
+    try {
+      final Map<String, dynamic> decoded;
+      try {
+        decoded = jsonDecode(raw) as Map<String, dynamic>;
+      } catch (_) {
+        _setFailure('That QR code is not in the right format.');
+        return;
+      }
+
       final scannedItemId = decoded['itemId'] as String?;
       final claimerId = decoded['claimerId'] as String?;
       final reqId = decoded['reqId'] as String?;
 
-      if (scannedItemId != widget.item.id) {
-        _setResult(
-          false,
-          'QR code does not match this item.\nDo not hand it over.',
-        );
+      if (scannedItemId == null || claimerId == null || reqId == null) {
+        _setFailure('That QR code is missing required fields.');
         return;
       }
-      if (claimerId == null || reqId == null) {
-        _setResult(false, 'Invalid QR code format.');
+
+      if (scannedItemId != widget.item.id) {
+        _setFailure('QR code does not match this item.\nDo not hand it over.');
         return;
       }
 
       final ownerUid = FirebaseAuth.instance.currentUser?.uid;
       if (ownerUid == null) {
-        _setResult(false, 'You must be signed in to confirm the exchange.');
+        _setFailure('You must be signed in to confirm the exchange.');
+        return;
+      }
+      if (ownerUid != widget.item.ownerUid) {
+        _setFailure('Only the item owner can confirm this exchange.');
         return;
       }
 
       final ok = await ClaimService.instance.completeExchange(
-        itemId: scannedItemId!,
+        itemId: scannedItemId,
+        itemTitle: widget.item.title,
         reqId: reqId,
         claimerId: claimerId,
-        ownerUid: widget.item.ownerUid,
+        ownerUid: ownerUid,
       );
 
+      if (!mounted) return;
       if (ok) {
-        _setResult(true, '✅ Exchange confirmed!\nYou can hand over the item.');
+        setState(() {
+          _phase = _ScanPhase.success;
+          _message = '✅ Exchange confirmed!\nYou can hand over the item.';
+        });
       } else {
-        _setResult(
-          false,
+        _setFailure(
           'Could not confirm exchange. This code may already be used.',
         );
       }
     } catch (e) {
-      _setResult(false, 'Could not read QR code. Please try again.');
+      _setFailure('Something went wrong while verifying. Please try again.');
     }
   }
 
-  void _setResult(bool success, String msg) {
+  void _setFailure(String msg) {
+    if (!mounted) return;
     setState(() {
-      _processing = false;
-      _done = true;
-      _success = success;
-      _resultMsg = msg;
+      _phase = _ScanPhase.failure;
+      _message = msg;
     });
+  }
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _ctrl?.toggleTorch();
+    } catch (_) {
+      // Some devices lack a torch — silently ignore.
+    }
   }
 
   @override
@@ -117,27 +231,65 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           style: TextStyle(color: AppColors.white),
         ),
         actions: [
-          if (!_done)
+          if (_phase == _ScanPhase.scanning)
             IconButton(
               icon: const Icon(Icons.flash_on_rounded, color: AppColors.white),
-              onPressed: () => _ctrl?.toggleTorch(),
+              onPressed: _toggleTorch,
             ),
         ],
       ),
-      body: _done ? _buildResult() : _buildScanner(),
+      body: _buildBody(),
     );
   }
 
+  Widget _buildBody() {
+    switch (_phase) {
+      case _ScanPhase.initializing:
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.yellow),
+        );
+      case _ScanPhase.permissionDenied:
+        return _ErrorPanel(
+          icon: Icons.no_photography_outlined,
+          title: 'Camera permission needed',
+          message: _message,
+          primaryLabel: 'Try Again',
+          onPrimary: _bootScanner,
+        );
+      case _ScanPhase.cameraError:
+        return _ErrorPanel(
+          icon: Icons.videocam_off_outlined,
+          title: 'Camera unavailable',
+          message: _message,
+          primaryLabel: 'Retry',
+          onPrimary: _bootScanner,
+        );
+      case _ScanPhase.success:
+      case _ScanPhase.failure:
+        return _ResultPanel(
+          success: _phase == _ScanPhase.success,
+          message: _message,
+          onRetry: _phase == _ScanPhase.failure ? _bootScanner : null,
+          onClose: () => Navigator.pop(context),
+        );
+      case _ScanPhase.scanning:
+      case _ScanPhase.processing:
+        return _buildScanner();
+    }
+  }
+
   Widget _buildScanner() {
+    final ctrl = _ctrl;
     return Stack(
       fit: StackFit.expand,
       children: [
-        MobileScanner(controller: _ctrl!, onDetect: _onDetect),
+        if (ctrl != null)
+          MobileScanner(controller: ctrl, onDetect: _onDetect)
+        else
+          const ColoredBox(color: Colors.black),
 
-        // Semi-transparent overlay with cutout
         _ScanOverlay(),
 
-        // Item label
         Positioned(
           top: 20,
           left: 0,
@@ -157,21 +309,19 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           ),
         ),
 
-        // Processing indicator
-        if (_processing)
+        if (_phase == _ScanPhase.processing)
           const Center(
             child: CircularProgressIndicator(color: AppColors.yellow),
           ),
 
-        // Bottom hint
-        if (!_processing)
+        if (_phase == _ScanPhase.scanning)
           const Positioned(
             bottom: 48,
             left: 0,
             right: 0,
             child: Center(
               child: Text(
-                'Point camera at the Receiver\'s QR code',
+                "Point camera at the Receiver's QR code",
                 style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
             ),
@@ -179,8 +329,25 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
       ],
     );
   }
+}
 
-  Widget _buildResult() {
+// ── Result + error panels ─────────────────────────────────────────────────────
+
+class _ResultPanel extends StatelessWidget {
+  final bool success;
+  final String message;
+  final VoidCallback? onRetry;
+  final VoidCallback onClose;
+
+  const _ResultPanel({
+    required this.success,
+    required this.message,
+    required this.onClose,
+    this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -192,20 +359,21 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (_success ? AppColors.green : AppColors.error)
-                    .withValues(alpha: 0.15),
+                color: (success ? AppColors.green : AppColors.error).withValues(
+                  alpha: 0.15,
+                ),
               ),
               child: Icon(
-                _success
+                success
                     ? Icons.check_circle_outline_rounded
                     : Icons.cancel_outlined,
                 size: 60,
-                color: _success ? AppColors.green : AppColors.error,
+                color: success ? AppColors.green : AppColors.error,
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              _success ? 'Exchange Complete!' : 'Verification Failed',
+              success ? 'Exchange Complete!' : 'Verification Failed',
               style: const TextStyle(
                 color: AppColors.white,
                 fontSize: 22,
@@ -214,7 +382,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              _resultMsg,
+              message,
               style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 15,
@@ -223,23 +391,16 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 40),
-            if (!_success)
+            if (onRetry != null)
               ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _done = false;
-                    _processing = false;
-                    _success = false;
-                  });
-                  _ctrl?.start();
-                },
+                onPressed: onRetry,
                 icon: const Icon(Icons.qr_code_scanner_rounded),
                 label: const Text('Try Again'),
               ),
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(_success ? 'Done' : 'Cancel'),
+              onPressed: onClose,
+              child: Text(success ? 'Done' : 'Cancel'),
             ),
           ],
         ),
@@ -248,7 +409,57 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   }
 }
 
-// ── Scan overlay cutout ────────────────────────────────────────────────────────
+class _ErrorPanel extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String primaryLabel;
+  final VoidCallback onPrimary;
+
+  const _ErrorPanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.primaryLabel,
+    required this.onPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 64, color: AppColors.mutedText),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.mutedText,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton(onPressed: onPrimary, child: Text(primaryLabel)),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ScanOverlay extends StatelessWidget {
   @override
@@ -273,7 +484,6 @@ class _OverlayPainter extends CustomPainter {
       ..fillType = PathFillType.evenOdd;
     canvas.drawPath(path, paint);
 
-    // Corner marks
     final cornerPaint = Paint()
       ..color = AppColors.green
       ..style = PaintingStyle.stroke
@@ -281,10 +491,8 @@ class _OverlayPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     const l = 24.0;
-    // Top-left
     canvas.drawLine(Offset(left, top + l), Offset(left, top), cornerPaint);
     canvas.drawLine(Offset(left, top), Offset(left + l, top), cornerPaint);
-    // Top-right
     canvas.drawLine(
       Offset(left + cutW - l, top),
       Offset(left + cutW, top),
@@ -295,7 +503,6 @@ class _OverlayPainter extends CustomPainter {
       Offset(left + cutW, top + l),
       cornerPaint,
     );
-    // Bottom-left
     canvas.drawLine(
       Offset(left, top + cutH - l),
       Offset(left, top + cutH),
@@ -306,7 +513,6 @@ class _OverlayPainter extends CustomPainter {
       Offset(left + l, top + cutH),
       cornerPaint,
     );
-    // Bottom-right
     canvas.drawLine(
       Offset(left + cutW, top + cutH - l),
       Offset(left + cutW, top + cutH),

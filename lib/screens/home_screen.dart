@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'splash_screen.dart';
 import 'main_navigation_screen.dart';
+import '../providers/notification_provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -41,6 +42,12 @@ class HomeScreen extends StatelessWidget {
         }
 
         if (!snapshot.hasData) {
+          // Tear down the per-user notification stream when the user signs
+          // out, so the listener doesn't error after auth is cleared.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            context.read<NotificationProvider>().bindUser(null);
+          });
           return const SplashScreen();
         }
 

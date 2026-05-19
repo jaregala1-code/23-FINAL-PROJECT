@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/notification_provider.dart';
 import '../providers/pantry_provider.dart';
 import '../theme/app_theme.dart';
 import 'pantry/pantry_screen.dart';
@@ -85,22 +86,66 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ],
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Notifications',
-            icon: const Icon(
-              Icons.notifications_outlined,
-              color: AppColors.white,
-            ),
-            onPressed: _openNotifications,
-          ),
-        ],
+        actions: [_NotificationBellAction(onPressed: _openNotifications)],
       ),
       body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: _ElBitesNavBar(
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),
       ),
+    );
+  }
+}
+
+// ── Notification bell with unread badge ──────────────────────────────────────
+
+class _NotificationBellAction extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _NotificationBellAction({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = context.watch<NotificationProvider>().unreadCount;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        IconButton(
+          tooltip: 'Notifications',
+          icon: const Icon(
+            Icons.notifications_outlined,
+            color: AppColors.white,
+          ),
+          onPressed: onPressed,
+        ),
+        if (unread > 0)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: unread > 9 ? 5 : 4,
+                vertical: 2,
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.darkBg, width: 1.5),
+              ),
+              child: Text(
+                unread > 99 ? '99+' : '$unread',
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

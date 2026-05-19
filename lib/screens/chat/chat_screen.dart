@@ -51,6 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
       senderId: widget.myUid,
       senderName: myName,
       text: text,
+      recipientUid: widget.chat.getOtherUid(widget.myUid),
     );
 
     await Future.delayed(const Duration(milliseconds: 80));
@@ -125,6 +126,7 @@ class _ChatScreenState extends State<ChatScreen> {
       text:
           'Pickup set for ${DateFormat('EEE MMM d, h:mm a').format(meetupTime)}',
       type: ChatMessageType.system,
+      recipientUid: receiverUid,
     );
   }
 
