@@ -1,45 +1,137 @@
 // notifications_screen.dart
-// This screen is currently unused, but will be used to show notifications related to the user's posts and pantry items in the future.
-// when someone comments on a post, likes a post, or when a pantry item is about to expire, the user will receive a notification that will be displayed on this screen. For now, it just shows a placeholder message.
-
+//
+// Placeholder Notifications screen. Once the backend feed exists, swap the
+// empty-state body for a [NotificationList] driven by a real data source.
+// Planned notification triggers:
+//   - Pantry items about to expire
+//   - Claims on a user's listings
+//   - Comments / likes on posts
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class NotificationsScreen extends StatelessWidget {
-  const NotificationsScreen({Key? key}) : super(key: key);
+  const NotificationsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
-      body: const Center(child: Text('No notifications yet')),
+      backgroundColor: AppColors.darkBg,
+      appBar: AppBar(
+        backgroundColor: AppColors.darkBg,
+        foregroundColor: AppColors.white,
+        title: const Text(
+          'Notifications',
+          style: TextStyle(
+            color: AppColors.white,
+            fontFamily: 'Sora',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: const _EmptyNotifications(),
     );
   }
-} 
+}
 
-// this widget is for listing notifications in a ListView, it will be used in the future when we implement the notifications feature. For now, it just shows a placeholder message.
-class NotificationList extends StatelessWidget {
-  const NotificationList({Key? key}) : super(key: key);
+class _EmptyNotifications extends StatelessWidget {
+  const _EmptyNotifications();
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: 0, // this will be the number of notifications in the future
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(
+              Icons.notifications_off_outlined,
+              size: 64,
+              color: AppColors.mutedText,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'No notifications yet',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.white,
+                fontFamily: 'Sora',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              "We'll let you know when there's activity on your posts, "
+              'claims, or expiring pantry items.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.mutedText,
+                fontFamily: 'Sora',
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A reusable list widget for displaying notifications. Currently unused;
+/// kept here so the screen can switch to it once a notifications data
+/// source is wired up. Accepts a list of [NotificationItem]s and renders
+/// each as a [ListTile].
+class NotificationList extends StatelessWidget {
+  final List<NotificationItem> items;
+
+  const NotificationList({super.key, this.items = const []});
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _EmptyNotifications();
+    }
+    return ListView.separated(
+      itemCount: items.length,
+      separatorBuilder: (_, __) =>
+          const Divider(height: 1, color: AppColors.border),
       itemBuilder: (context, index) {
+        final n = items[index];
         return ListTile(
-          leading: const Icon(Icons.notification_important),
-          title: Text('Notification $index'), // this will be the notification message in the future
-          subtitle: Text('This is a notification description.'), // this will be the notification description in the future
+          leading: const Icon(
+            Icons.notification_important,
+            color: AppColors.green,
+          ),
+          title: Text(
+            n.title,
+            style: const TextStyle(
+              color: AppColors.white,
+              fontFamily: 'Sora',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            n.body,
+            style: const TextStyle(
+              color: AppColors.mutedText,
+              fontFamily: 'Sora',
+            ),
+          ),
         );
       },
     );
   }
 }
 
-// New notifications for pantry items about to expire
-// New notifications for claiming
-// New notifications for comments on posts
-// New notifications for likes on posts
+/// Lightweight model for a single notification entry. Replace or extend
+/// when the backend schema is finalized.
+class NotificationItem {
+  final String title;
+  final String body;
 
-// In the future, we will implement a notification system that will allow users to receive notifications for various events such as when someone comments on their post, likes their post, or when a pantry item is about to expire. These notifications will be displayed on this screen using the NotificationList widget. For now, we just show a placeholder message indicating that there are no notifications yet.
-
+  const NotificationItem({required this.title, required this.body});
+}
