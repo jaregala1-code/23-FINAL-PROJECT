@@ -83,40 +83,25 @@ class ChatProvider extends ChangeNotifier {
         qrItemTitle: qrItemTitle,
       );
       await msgRef.set(msg.toFirestore());
-      // The chat list preview text mirrors the kind of message that was sent.
-      final preview = type == ChatMessageType.qr
-          ? '📲 Shared QR code'
-          : type == ChatMessageType.system
-          ? 'ℹ️ $text'
-          : text;
-      await _db.collection(_chats).doc(chatId).update({
-        'lastMessage': preview,
-        'lastSenderId': senderId,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      // System messages shouldn't claim the "last message" preview — they're
+      // informational. QR + text both update the chat list preview.
+      if (type != ChatMessageType.system) {
+        await _db.collection(_chats).doc(chatId).update({
+          'lastMessage': text,
+          'lastSenderId': senderId,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await _db.collection(_chats).doc(chatId).update({
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
       return true;
     } catch (e) {
       debugPrint('[ChatProvider] sendMessage error: $e');
       return false;
     }
   }
-
-  /// Convenience for posting an inline QR code into the chat.
-  Future<bool> sendQrMessage({
-    required String chatId,
-    required String senderId,
-    required String senderName,
-    required String qrToken,
-    required String itemTitle,
-  }) => sendMessage(
-    chatId: chatId,
-    senderId: senderId,
-    senderName: senderName,
-    text: 'Pickup QR code',
-    type: ChatMessageType.qr,
-    qrToken: qrToken,
-    qrItemTitle: itemTitle,
-  );
 
   // ── Archive chat (called on item completion) ──────────────────────────────
 

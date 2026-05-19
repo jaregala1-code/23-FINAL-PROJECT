@@ -5,6 +5,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ─── ClaimRequest ─────────────────────────────────────────────────────────────
+// Stored at: surplus_items/{itemId}/requests/{requesterUid}
+// The existing ItemRequest in surplus_item.dart only has basic fields.
+// This extended version adds the QR token and claim lifecycle for Milestone 3.
 
 class ClaimRequest {
   final String id;
@@ -96,6 +99,9 @@ class ClaimRequest {
 }
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
+// Chat ID = alphabetically sorted UID pair joined by underscore.
+// Stored at: chats/{chatId}
+// Messages at: chats/{chatId}/messages/{msgId}
 
 class Chat {
   final String id;
@@ -162,7 +168,32 @@ class Chat {
 
 // ─── ChatMessage ─────────────────────────────────────────────────────────────
 
+/// Wire type stored at `chats/{chatId}/messages/{msgId}.type`. Older docs
+/// have no `type` field and are treated as plain text.
 enum ChatMessageType { text, qr, system }
+
+ChatMessageType _msgTypeFromString(String? raw) {
+  switch (raw) {
+    case 'qr':
+      return ChatMessageType.qr;
+    case 'system':
+      return ChatMessageType.system;
+    case 'text':
+    default:
+      return ChatMessageType.text;
+  }
+}
+
+String msgTypeToWireString(ChatMessageType t) {
+  switch (t) {
+    case ChatMessageType.qr:
+      return 'qr';
+    case ChatMessageType.system:
+      return 'system';
+    case ChatMessageType.text:
+      return 'text';
+  }
+}
 
 class ChatMessage {
   final String id;
@@ -196,21 +227,10 @@ class ChatMessage {
       text: d['text'] as String? ?? '',
       timestamp: (d['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: d['isRead'] as bool? ?? false,
-      type: _parseType(d['type'] as String?),
+      type: _msgTypeFromString(d['type'] as String?),
       qrToken: d['qrToken'] as String?,
       qrItemTitle: d['qrItemTitle'] as String?,
     );
-  }
-
-  static ChatMessageType _parseType(String? raw) {
-    switch (raw) {
-      case 'qr':
-        return ChatMessageType.qr;
-      case 'system':
-        return ChatMessageType.system;
-      default:
-        return ChatMessageType.text;
-    }
   }
 
   Map<String, dynamic> toFirestore() => {
@@ -219,7 +239,7 @@ class ChatMessage {
     'text': text,
     'timestamp': Timestamp.fromDate(timestamp),
     'isRead': isRead,
-    'type': type.name,
+    'type': msgTypeToWireString(type),
     if (qrToken != null) 'qrToken': qrToken,
     if (qrItemTitle != null) 'qrItemTitle': qrItemTitle,
   };

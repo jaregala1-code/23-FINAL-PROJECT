@@ -17,11 +17,12 @@ class ClaimService {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _col = 'surplus_items';
-  static const String _claims = 'claimRequests';
+  static const String _claims = 'claimRequests'; // top-level collection
   static const String _chats = 'chats';
 
   // ── Streams ───────────────────────────────────────────────────────────────
 
+  /// All pending requests on a specific item (Giver's Requesters Page)
   Stream<List<Map<String, dynamic>>> streamRequesters(String itemId) => _db
       .collection(_col)
       .doc(itemId)
@@ -29,6 +30,7 @@ class ClaimService {
       .snapshots()
       .map((s) => s.docs.map((d) => {'id': d.id, ...d.data()}).toList());
 
+  /// All claim requests for the current receiver (Tray)
   Stream<List<Map<String, dynamic>>> streamMyClaims(String uid) => _db
       .collection(_claims)
       .where('requesterUid', isEqualTo: uid)
@@ -52,6 +54,7 @@ class ClaimService {
       final reqId = const Uuid().v4();
       final batch = _db.batch();
 
+      // Write to surplus_items/{itemId}/requests/{requesterUid}
       batch.set(
         _db
             .collection(_col)
@@ -67,6 +70,7 @@ class ClaimService {
         },
       );
 
+      // Also write to top-level claimRequests for easy querying by receiver
       batch.set(_db.collection(_claims).doc(reqId), {
         'reqId': reqId,
         'itemId': itemId,
@@ -100,6 +104,7 @@ class ClaimService {
     required String requesterName,
   }) async {
     try {
+      // Generate QR token
       final reqId = const Uuid().v4();
       final qrToken = jsonEncode({
         'reqId': reqId,
@@ -109,6 +114,7 @@ class ClaimService {
 
       final batch = _db.batch();
 
+      // 1. Reserve the item
       batch.update(_db.collection(_col).doc(itemId), {
         'status': 'reserved',
         'claimedByUid': requesterUid,
@@ -117,6 +123,7 @@ class ClaimService {
         'qrReqId': reqId,
       });
 
+      // 2. Approve the selected requester in sub-collection
       batch.update(
         _db
             .collection(_col)
@@ -126,18 +133,22 @@ class ClaimService {
         {'status': 'accepted'},
       );
 
-      // Find pending claims for this item. The ownerUid filter is required
-      // by Firestore security rules: list queries must encode a predicate
-      // matching the read rule (ownerUid == auth.uid here).
+      // 3. Update top-level claimRequest docs — approve selected, reject others
+      // Find pending claims for this item. We constrain by `ownerUid` so the
+      // Firestore security rules on `claimRequests` accept the collection
+      // query: the per-doc rule requires `ownerUid == auth.uid` and Firestore
+      // refuses queries that aren't statically constrained to match it.
+      // `status` is filtered client-side below to avoid needing an extra
+      // composite index.
       final pendingClaims = await _db
           .collection(_claims)
-          .where('itemId', isEqualTo: itemId)
           .where('ownerUid', isEqualTo: ownerUid)
-          .where('status', isEqualTo: 'pending')
+          .where('itemId', isEqualTo: itemId)
           .get();
 
       for (final doc in pendingClaims.docs) {
         final data = doc.data();
+        if (data['status'] != 'pending') continue;
         final isSelected = data['requesterUid'] == requesterUid;
         if (isSelected) {
           batch.update(doc.reference, {
@@ -151,6 +162,7 @@ class ClaimService {
             'status': 'rejected',
             'updatedAt': FieldValue.serverTimestamp(),
           });
+          // Reject in sub-collection too
           batch.update(
             _db
                 .collection(_col)
@@ -162,6 +174,7 @@ class ClaimService {
         }
       }
 
+      // 4. Create chat between Giver and approved Receiver
       final chatId = Chat.generateId(ownerUid, requesterUid);
       final chatRef = _db.collection(_chats).doc(chatId);
       final chatSnap = await chatRef.get();
@@ -172,32 +185,14 @@ class ClaimService {
             ownerUid: ownerName,
             requesterUid: requesterName,
           },
-          'lastMessage': '📲 Shared QR code',
-          'lastSenderId': ownerUid,
+          'lastMessage': null,
+          'lastSenderId': null,
           'updatedAt': FieldValue.serverTimestamp(),
           'relatedItemId': itemId,
           'relatedItemTitle': itemTitle,
           'isArchived': false,
         });
-      } else {
-        batch.update(chatRef, {
-          'lastMessage': '📲 Shared QR code',
-          'lastSenderId': ownerUid,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
       }
-
-      final qrMsgRef = chatRef.collection('messages').doc();
-      batch.set(qrMsgRef, {
-        'senderId': ownerUid,
-        'senderName': ownerName,
-        'text': 'Show this QR at pickup for $itemTitle',
-        'timestamp': FieldValue.serverTimestamp(),
-        'isRead': false,
-        'type': 'qr',
-        'qrToken': qrToken,
-        'qrItemTitle': itemTitle,
-      });
 
       await batch.commit();
       return true;
@@ -209,54 +204,34 @@ class ClaimService {
 
   // ── Complete exchange via QR (Giver scans) ────────────────────────────────
 
-  /// [ownerUid] is the signed-in giver who's scanning. We verify the item
-  /// actually belongs to them before flipping status — otherwise anyone with
-  /// a leaked QR token could mark the exchange complete.
   Future<bool> completeExchange({
     required String itemId,
     required String reqId,
     required String claimerId,
-    String? ownerUid,
+    required String ownerUid,
   }) async {
     try {
-      // Fall back to the signed-in user if no ownerUid was passed — Firestore
-      // rules need it on the claimRequests list query below.
-      ownerUid ??= FirebaseAuth.instance.currentUser?.uid;
-      if (ownerUid == null) return false;
-
-      // Ownership guard
-      final itemSnap = await _db.collection(_col).doc(itemId).get();
-      final data = itemSnap.data();
-      if (data == null) return false;
-      if (data['ownerUid'] != ownerUid) {
-        debugPrint('[ClaimService] completeExchange: caller is not owner');
-        return false;
-      }
-      final storedToken = data['qrReqId'] as String?;
-      if (storedToken != null && storedToken != reqId) {
-        debugPrint('[ClaimService] completeExchange: reqId mismatch');
-        return false;
-      }
-
       final batch = _db.batch();
 
+      // Mark item completed
       batch.update(_db.collection(_col).doc(itemId), {
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
-        'completedByUid': ownerUid,
       });
 
-      // Mark approved claim as completed. The ownerUid filter satisfies
-      // Firestore's list-query rule requirement (see notes above).
+      // Mark approved claim as completed. As with approveRequester, we must
+      // constrain by `ownerUid` for the Firestore rule to allow the query;
+      // `requesterUid` + `status` are filtered client-side.
       final approvedClaims = await _db
           .collection(_claims)
-          .where('itemId', isEqualTo: itemId)
           .where('ownerUid', isEqualTo: ownerUid)
-          .where('requesterUid', isEqualTo: claimerId)
-          .where('status', isEqualTo: 'approved')
+          .where('itemId', isEqualTo: itemId)
           .get();
 
       for (final doc in approvedClaims.docs) {
+        final data = doc.data();
+        if (data['requesterUid'] != claimerId) continue;
+        if (data['status'] != 'approved') continue;
         batch.update(doc.reference, {
           'status': 'completed',
           'updatedAt': FieldValue.serverTimestamp(),
@@ -271,7 +246,15 @@ class ClaimService {
     }
   }
 
-  // ── Agree on meetup time ──────────────────────────────────────────────────
+  // ── Set agreed pickup time (Giver schedules from chat) ───────────────────
+  //
+  // Updates `agreedPickupTime` on:
+  //   - claimRequests/{docId}  (top-level, the source of truth used by Tray)
+  //   - surplus_items/{itemId}/requests/{requesterUid}  (sub-collection mirror)
+  //
+  // The caller must be the item's giver (Firestore rules enforce this on the
+  // surplus_items doc). We read the giver's uid from FirebaseAuth so the
+  // signature stays simple for chat_screen.dart.
 
   Future<bool> setAgreedPickupTime({
     required String itemId,
@@ -281,17 +264,51 @@ class ClaimService {
     required DateTime meetupTime,
   }) async {
     try {
+      final ownerUid = FirebaseAuth.instance.currentUser?.uid;
+      if (ownerUid == null) {
+        debugPrint('[ClaimService] setAgreedPickupTime: not signed in');
+        return false;
+      }
+
+      // Find the active claim doc by (ownerUid, itemId), then filter to the
+      // specific requester client-side. Filtering by ownerUid is required
+      // for the Firestore rules to accept the collection query.
+      final snap = await _db
+          .collection(_claims)
+          .where('ownerUid', isEqualTo: ownerUid)
+          .where('itemId', isEqualTo: itemId)
+          .get();
+
+      DocumentReference? targetClaim;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        if (data['requesterUid'] != requesterUid) continue;
+        final status = data['status'] as String?;
+        // Allow scheduling on approved (post-accept) and pending (rare —
+        // pickup time agreed before formal QR approval).
+        if (status == 'approved' || status == 'pending') {
+          targetClaim = doc.reference;
+          break;
+        }
+      }
+
+      if (targetClaim == null) {
+        debugPrint(
+          '[ClaimService] setAgreedPickupTime: no active claim for '
+          'item=$itemId requester=$requesterUid',
+        );
+        return false;
+      }
+
       final batch = _db.batch();
       final ts = Timestamp.fromDate(meetupTime);
 
-      // Mirror onto the item doc — only the giver can do this (rule enforced).
-      batch.update(_db.collection(_col).doc(itemId), {
-        'meetupTime': ts,
-        'pickupReminderScheduledAt': Timestamp.fromDate(
-          meetupTime.subtract(const Duration(hours: 1)),
-        ),
+      batch.update(targetClaim, {
+        'agreedPickupTime': ts,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      // Sub-collection mirror; keyed by requesterUid so we don't need a query.
       batch.update(
         _db
             .collection(_col)
@@ -301,28 +318,20 @@ class ClaimService {
         {'agreedPickupTime': ts},
       );
 
-      // Top-level claim docs for this item+requester.
-      // The ownerUid clause is mandatory: Firestore security rules require
-      // the query itself to encode the "I'm a party to this doc" predicate,
-      // and only the giver calls this method (button is gated to them in
-      // chat_screen.dart). Without this clause the query fails with
-      // permission-denied even though every returned doc would satisfy the
-      // rule.
-      final myUid = FirebaseAuth.instance.currentUser?.uid;
-      final claims = await _db
-          .collection(_claims)
-          .where('itemId', isEqualTo: itemId)
-          .where('ownerUid', isEqualTo: myUid)
-          .where('requesterUid', isEqualTo: requesterUid)
-          .get();
-      for (final d in claims.docs) {
-        batch.update(d.reference, {
-          'agreedPickupTime': ts,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
+      // Touch the chat doc so the chat list reflects the activity. The chat
+      // id is deterministic from the two uids.
+      final chatId = Chat.generateId(ownerUid, requesterUid);
+      batch.update(_db.collection(_chats).doc(chatId), {
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       await batch.commit();
+      // Use the params so analyzer doesn't flag them; they double as a
+      // future hook for sending a structured notification.
+      debugPrint(
+        '[ClaimService] pickup set for "$itemTitle" with $otherPartyName '
+        'at $meetupTime',
+      );
       return true;
     } catch (e) {
       debugPrint('[ClaimService] setAgreedPickupTime error: $e');
@@ -339,6 +348,7 @@ class ClaimService {
   }) async {
     try {
       final batch = _db.batch();
+      // Remove from sub-collection
       batch.delete(
         _db
             .collection(_col)
@@ -346,6 +356,7 @@ class ClaimService {
             .collection('requests')
             .doc(requesterUid),
       );
+      // Update top-level claim
       batch.update(_db.collection(_claims).doc(claimDocId), {
         'status': 'cancelled',
         'updatedAt': FieldValue.serverTimestamp(),

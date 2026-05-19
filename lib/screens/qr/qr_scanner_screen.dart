@@ -74,7 +74,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
         itemId: scannedItemId!,
         reqId: reqId,
         claimerId: claimerId,
-        ownerUid: ownerUid,
+        ownerUid: widget.item.ownerUid,
       );
 
       if (ok) {

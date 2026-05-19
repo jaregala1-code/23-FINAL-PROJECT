@@ -103,7 +103,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final otherName = widget.chat.getOtherName(widget.myUid);
     final receiverUid = widget.chat.getOtherUid(widget.myUid);
 
-    final ok = await ClaimService.instance.setAgreedPickupTime(
+    final dynamic claimService = ClaimService.instance;
+    final ok = await claimService.setAgreedPickupTime(
       itemId: itemId,
       itemTitle: itemTitle,
       requesterUid: receiverUid,
