@@ -18,6 +18,7 @@ import 'pantry/tray_screen.dart';
 import 'pantry/add_item_screen.dart';
 import 'chat/chat_list_screen.dart';
 import 'profile_screen.dart';
+import 'notifications_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final User firebaseUser;
@@ -147,35 +148,91 @@ class _NavItem extends StatelessWidget {
     this.isAccent = false,
   });
 
+  // @override
+  // Widget build(BuildContext context) {
+  //   final Color activeColor = isAccent ? AppColors.yellow : AppColors.green;
+  //   return Expanded(
+  //     child: InkWell(
+  //       onTap: onTap,
+  //       splashColor: Colors.transparent,
+  //       highlightColor: Colors.transparent,
+  //       child: Column(
+  //         mainAxisAlignment: MainAxisAlignment.center,
+  //         children: [
+  //           Icon(
+  //             isActive ? activeIcon : icon,
+  //             color: isActive ? activeColor : AppColors.mutedText,
+  //             size: 22,
+  //           ),
+  //           const SizedBox(height: 3),
+  //           Text(
+  //             label,
+  //             style: TextStyle(
+  //               color: isActive ? activeColor : AppColors.mutedText,
+  //               fontSize: 10,
+  //               fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+  //               fontFamily: 'Sora',
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
+
+  // added notification bell link to the pantry screen for testing purposes, can be removed later
   @override
-  Widget build(BuildContext context) {
-    final Color activeColor = isAccent ? AppColors.yellow : AppColors.green;
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.darkBg,
+    appBar: AppBar(
+      backgroundColor: AppColors.darkBg,
+      automaticallyImplyLeading: false,
+      title: RichText(
+        text: const TextSpan(
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: isActive ? activeColor : AppColors.mutedText,
-              size: 22,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
+            TextSpan(
+              text: 'EL',
               style: TextStyle(
-                color: isActive ? activeColor : AppColors.mutedText,
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                color: AppColors.green,
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontFamily: 'Sora',
+              ),
+            ),
+            TextSpan(
+              text: 'Bites',
+              style: TextStyle(
+                color: AppColors.white,
+                fontWeight: FontWeight.w300,
+                fontSize: 20,
                 fontFamily: 'Sora',
               ),
             ),
           ],
         ),
       ),
-    );
-  }
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined, color: AppColors.white),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const NotificationsScreen(),
+            ),
+          ),
+        ),
+      ],
+    ),
+    body: IndexedStack(index: _currentIndex, children: _pages),
+    bottomNavigationBar: _ElBitesNavBar(
+      currentIndex: _currentIndex,
+      onTap: (i) => setState(() => _currentIndex = i),
+    ),
+  );
+} // end of the build method of _NavItem, which is now a full Scaffold for testing purposes
+
+
+
+
 }
