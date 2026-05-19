@@ -1,7 +1,12 @@
 // lib/screens/pantry/pantry_screen.dart
+//
+// Bumble-style swipe card feed.
+// _dismissed is persisted to Firestore (users/{uid}/dismissedItems)
+// so swiped items do not reappear after logout/login.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/surplus_item.dart';
 import '../../providers/pantry_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -20,15 +25,66 @@ class PantryScreen extends StatefulWidget {
 
 class _PantryScreenState extends State<PantryScreen>
     with SingleTickerProviderStateMixin {
-  // Track items already swiped so reloads don't re-show them
+  // Persisted across sessions via Firestore
   final Set<String> _dismissed = {};
+  bool _dismissedLoaded = false;
 
-  // Drag state for swipe overlay
+  // Drag / animation state
   double _dragX = 0;
-
   late AnimationController _flyCtrl;
   late Animation<Offset> _flyAnim;
   bool _isAnimating = false;
+
+  // ── Firestore helpers ───────────────────────────────────────────────────────
+
+  String? _myUid() {
+    final auth = context.read<UserAuthProvider>();
+    final user = context.read<UserProvider>();
+    return auth.appUser?.uid ?? user.user?.uid;
+  }
+
+  /// Load dismissed item IDs from Firestore when screen first opens.
+  Future<void> _loadDismissed() async {
+    final uid = _myUid();
+    if (uid == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final data = doc.data();
+      if (data != null && data['dismissedItems'] is List) {
+        final ids = List<String>.from(data['dismissedItems'] as List);
+        if (mounted) {
+          setState(() {
+            _dismissed.addAll(ids);
+            _dismissedLoaded = true;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _dismissedLoaded = true);
+      }
+    } catch (_) {
+      // Fail silently — worst case items reappear once
+      if (mounted) setState(() => _dismissedLoaded = true);
+    }
+  }
+
+  /// Persist a newly dismissed item ID to Firestore using arrayUnion.
+  Future<void> _persistDismissed(String itemId) async {
+    final uid = _myUid();
+    if (uid == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'dismissedItems': FieldValue.arrayUnion([itemId]),
+      });
+    } catch (_) {
+      // Non-critical — local set already updated
+    }
+  }
+
+  // ── Lifecycle ───────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -37,10 +93,10 @@ class _PantryScreenState extends State<PantryScreen>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _flyAnim = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _flyCtrl, curve: Curves.easeOut));
+    _flyAnim = const AlwaysStoppedAnimation(Offset.zero);
+
+    // Load persisted dismissed IDs after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDismissed());
   }
 
   @override
@@ -48,6 +104,8 @@ class _PantryScreenState extends State<PantryScreen>
     _flyCtrl.dispose();
     super.dispose();
   }
+
+  // ── Swipe logic ─────────────────────────────────────────────────────────────
 
   Future<void> _animateOff(bool toRight) async {
     setState(() => _isAnimating = true);
@@ -68,6 +126,7 @@ class _PantryScreenState extends State<PantryScreen>
     await _animateOff(true);
     _dismissed.add(item.id!);
     setState(() {});
+    _persistDismissed(item.id!); // ← write to Firestore
     _sendClaimRequest(item);
   }
 
@@ -76,6 +135,7 @@ class _PantryScreenState extends State<PantryScreen>
     await _animateOff(false);
     _dismissed.add(item.id!);
     setState(() {});
+    _persistDismissed(item.id!); // ← write to Firestore
   }
 
   void _sendClaimRequest(SurplusItem item) async {
@@ -132,6 +192,8 @@ class _PantryScreenState extends State<PantryScreen>
     );
   }
 
+  // ── Build ───────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final pantry = context.watch<PantryProvider>();
@@ -143,6 +205,12 @@ class _PantryScreenState extends State<PantryScreen>
       appBar: _buildAppBar(context),
       body: Builder(
         builder: (_) {
+          // Show spinner until dismissed list is loaded from Firestore
+          if (!_dismissedLoaded) {
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.yellow),
+            );
+          }
           if (pantry.loading) {
             return const Center(
               child: CircularProgressIndicator(color: AppColors.yellow),
@@ -156,7 +224,6 @@ class _PantryScreenState extends State<PantryScreen>
             );
           }
 
-          // Filter out own items and already-dismissed
           final items = pantry.items
               .where(
                 (i) =>
@@ -200,9 +267,7 @@ class _PantryScreenState extends State<PantryScreen>
                   onTap: () => _openDetail(items[0]),
                   onHorizontalDragUpdate: (d) {
                     if (_isAnimating) return;
-                    setState(() {
-                      _dragX += d.delta.dx;
-                    });
+                    setState(() => _dragX += d.delta.dx);
                   },
                   onHorizontalDragEnd: (d) {
                     if (_isAnimating) return;
@@ -212,9 +277,7 @@ class _PantryScreenState extends State<PantryScreen>
                     } else if (_dragX < -80 || velocity < -400) {
                       _swipeLeft(items[0]);
                     } else {
-                      setState(() {
-                        _dragX = 0;
-                      });
+                      setState(() => _dragX = 0);
                     }
                   },
                   child: AnimatedBuilder(
@@ -226,13 +289,15 @@ class _PantryScreenState extends State<PantryScreen>
                               _dragX / MediaQuery.of(context).size.width,
                               0,
                             );
-                      final angle = offset.dx * 0.3;
                       return Transform.translate(
                         offset: Offset(
                           offset.dx * MediaQuery.of(context).size.width,
                           0,
                         ),
-                        child: Transform.rotate(angle: angle, child: child),
+                        child: Transform.rotate(
+                          angle: offset.dx * 0.3,
+                          child: child,
+                        ),
                       );
                     },
                     child: SwipeCard(
@@ -301,7 +366,6 @@ class _PantryScreenState extends State<PantryScreen>
   }
 
   void _showFilterSheet(BuildContext context) {
-    // Simple tag filter — can be expanded
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.cardBg,
